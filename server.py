@@ -22,6 +22,8 @@ async def download_video(url: str = Form(...)):
         "noplaylist": True,
         "quiet": True,
         "no_warnings": True,
+        "no_config": True,
+        "cookiefile": None,
         "extractor_args": {
             "youtube": {
                 "player_client": ["android", "ios", "web"],
