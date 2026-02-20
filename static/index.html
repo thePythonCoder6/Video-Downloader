@@ -1,22 +1,85 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Video Downloader</title>
-    <link rel="stylesheet" href="styles.css">
+<meta charset="UTF-8">
+<title>Downloader</title>
+
+<style>
+body {
+    margin:0;
+    font-family: Arial, sans-serif;
+    background:#121212;
+    color:white;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    height:100vh;
+}
+
+.container {
+    background:#1e1e1e;
+    padding:30px;
+    border-radius:12px;
+    box-shadow:0 0 20px rgba(0,0,0,0.4);
+    text-align:center;
+}
+
+input {
+    width:320px;
+    padding:10px;
+    margin:10px 0;
+}
+
+button {
+    padding:10px 18px;
+    cursor:pointer;
+}
+</style>
 </head>
+
 <body>
-    <div class="container">
-        <h1>Video Downloader</h1>
-        <form id="download-form">
-            <label for="video-url">Video URL:</label>
-            <input type="text" id="video-url" name="video-url" required>
-            <br>
-            <button type="submit">Download</button>
-        </form>
-        <div id="status"></div>
-    </div>
-    <script src="script.js"></script>
+
+<div class="container">
+    <h2>Video Downloader</h2>
+
+    <input id="url" placeholder="Paste video URL">
+    <br>
+    <button onclick="start()">Download</button>
+
+    <p id="status"></p>
+</div>
+
+<script>
+async function start() {
+    const url = document.getElementById("url").value;
+    const status = document.getElementById("status");
+
+    status.textContent = "Processing...";
+
+    const form = new FormData();
+    form.append("url", url);
+
+    try {
+        const res = await fetch("/api/download", {
+            method: "POST",
+            body: form
+        });
+
+        const data = await res.json();
+
+        if (data.error) {
+            status.textContent = data.error;
+            return;
+        }
+
+        status.innerHTML =
+            `<a href="${data.file}" style="color:#4ea3ff">Download file</a>`;
+
+    } catch {
+        status.textContent = "Request failed";
+    }
+}
+</script>
+
 </body>
 </html>
