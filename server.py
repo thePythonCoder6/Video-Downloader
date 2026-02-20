@@ -18,27 +18,15 @@ async def download_video(url: str = Form(...)):
 
     opts = {
         "outtmpl": template,
-        "format": "best[height<=1080]",
+        "format": "best",
         "noplaylist": True,
-        "quiet": True,
-        "no_warnings": True,
-        "no_config": True,
-        "age_limit": None,
-        "geo_bypass": True,
-        "nocheckcertificate": True,
+        "quiet": False,
+        "no_warnings": False,
         "extractor_args": {
             "youtube": {
-                "player_client": ["android_creator"],
-                "skip": ["hls", "dash", "translated_subs"],
+                "player_client": ["tv_embedded", "web"],
+                "skip": ["translated_subs"],
             }
-        },
-        "http_headers": {
-            "User-Agent": "com.google.android.apps.youtube.creator/24.06.103 (Linux; U; Android 14; en_US) gzip",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "en-us,en;q=0.5",
-            "Accept-Encoding": "gzip, deflate",
-            "X-YouTube-Client-Name": "14",
-            "X-YouTube-Client-Version": "24.06.103",
         },
     }
 
