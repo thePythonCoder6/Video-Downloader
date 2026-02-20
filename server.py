@@ -19,7 +19,11 @@ async def download_video(url: str = Form(...)):
     opts = {
         "outtmpl": template,
         "format": "best",
-        "noplaylist": True
+        "noplaylist": True,
+        "cookiesfrombrowser": ("chrome",),
+        "quiet": True,
+        "no_warnings": True,
+        "extractor_args": {"youtube": {"player_client": ["android", "web"]}}
     }
 
     try:
