@@ -1,1 +1,47 @@
-from fastapi import FastAPI\nfrom pydantic import BaseModel\nimport requests\n\napp = FastAPI()\n\nclass VideoRequest(BaseModel):\n    url: str\n\n@app.post("/download/")\nasync def download_video(request: VideoRequest):\n    response = requests.get(request.url)\n    # Assuming the video is directly retrievable from the URL\n    with open('downloaded_video.mp4', 'wb') as video_file:\n        video_file.write(response.content)\n    return {"message": "Video downloaded successfully!"}
+from fastapi import FastAPI, Form
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+import yt_dlp
+import uuid
+import os
+
+app = FastAPI()
+
+DOWNLOAD_DIR = "downloads"
+os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+
+# Serve frontend
+app.mount("/", StaticFiles(directory="static", html=True), name="static")
+
+
+@app.post("/api/download")
+async def download_video(url: str = Form(...)):
+    file_id = str(uuid.uuid4())
+    template = os.path.join(DOWNLOAD_DIR, f"{file_id}.%(ext)s")
+
+    opts = {
+        "outtmpl": template,
+        "format": "best",
+        "noplaylist": True
+    }
+
+    try:
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            ext = info.get("ext", "mp4")
+
+        filename = f"{file_id}.{ext}"
+        return JSONResponse({"file": f"/api/file/{filename}"})
+
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.get("/api/file/{filename}")
+async def get_file(filename: str):
+    path = os.path.join(DOWNLOAD_DIR, filename)
+
+    if not os.path.exists(path):
+        return JSONResponse({"error": "File not found"}, status_code=404)
+
+    return FileResponse(path, filename=filename)
