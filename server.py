@@ -16,30 +16,61 @@ async def download_video(url: str = Form(...)):
     file_id = str(uuid.uuid4())
     template = os.path.join(DOWNLOAD_DIR, f"{file_id}.%(ext)s")
 
-    opts = {
-        "outtmpl": template,
-        "format": "best",
-        "noplaylist": True,
-        "quiet": False,
-        "no_warnings": False,
-        "extractor_args": {
-            "youtube": {
-                "player_client": ["tv_embedded", "web"],
-                "skip": ["translated_subs"],
-            }
+    # Try multiple strategies
+    strategies = [
+        # Strategy 1: Use proxy
+        {
+            "outtmpl": template,
+            "format": "best",
+            "noplaylist": True,
+            "quiet": True,
+            "proxy": "socks5://orbtl.com:4145",
+            "socket_timeout": 30,
         },
-    }
+        # Strategy 2: tv_embedded with no check certificate
+        {
+            "outtmpl": template,
+            "format": "best",
+            "noplaylist": True,
+            "quiet": True,
+            "nocheckcertificate": True,
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["tv_embedded"],
+                    "skip": ["translated_subs"],
+                }
+            },
+        },
+        # Strategy 3: mediaconnect client
+        {
+            "outtmpl": template,
+            "format": "best",
+            "noplaylist": True,
+            "quiet": True,
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["mediaconnect"],
+                }
+            },
+        },
+    ]
 
-    try:
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            ext = info.get("ext", "mp4")
+    last_error = None
+    for i, opts in enumerate(strategies, 1):
+        try:
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+                ext = info.get("ext", "mp4")
 
-        filename = f"{file_id}.{ext}"
-        return JSONResponse({"file": f"/api/file/{filename}"})
+            filename = f"{file_id}.{ext}"
+            return JSONResponse({"file": f"/api/file/{filename}"})
 
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
+        except Exception as e:
+            last_error = str(e)
+            if i < len(strategies):
+                continue  # Try next strategy
+            
+    return JSONResponse({"error": f"All download strategies failed. Last error: {last_error}"}, status_code=500)
 
 
 @app.get("/api/file/{filename}")
