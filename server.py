@@ -10,9 +10,6 @@ app = FastAPI()
 DOWNLOAD_DIR = "downloads"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
-# Serve frontend
-app.mount("/", StaticFiles(directory="static", html=True), name="static")
-
 
 @app.post("/api/download")
 async def download_video(url: str = Form(...)):
@@ -45,3 +42,8 @@ async def get_file(filename: str):
         return JSONResponse({"error": "File not found"}, status_code=404)
 
     return FileResponse(path, filename=filename)
+
+
+@app.get("/")
+async def index():
+    return FileResponse("static/index.html")
