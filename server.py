@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Form
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 import yt_dlp
 import uuid
@@ -23,17 +23,17 @@ async def download_video(url: str = Form(...)):
         "quiet": True,
         "no_warnings": True,
         "no_config": True,
-        "cookiefile": None,
         "extractor_args": {
             "youtube": {
-                "player_client": ["android", "ios", "web"],
-                "skip": ["hls", "dash"],
+                "player_client": ["android", "ios", "mweb"],
+                "skip": ["hls"],
             }
         },
         "http_headers": {
-            "User-Agent": "com.google.android.youtube/17.36.4 (Linux; U; Android 12; GB) gzip",
+            "User-Agent": "com.google.android.youtube/19.09.37 (Linux; U; Android 13) gzip",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language": "en-us,en;q=0.5",
+            "Accept-Encoding": "gzip, deflate",
         },
     }
 
@@ -62,3 +62,8 @@ async def get_file(filename: str):
 @app.get("/")
 async def index():
     return FileResponse("static/index.html")
+
+
+@app.head("/")
+async def head_index():
+    return Response(status_code=200)
