@@ -44,20 +44,27 @@ button {
 
     <input id="url" placeholder="Paste video URL">
     <br>
+    <textarea id="cookies" placeholder="Paste cookies (optional - for YouTube bot protection)" rows="4" style="width:320px;margin:10px 0;padding:10px;font-size:12px;"></textarea>
+    <br>
     <button onclick="start()">Download</button>
 
     <p id="status"></p>
+    <p style="font-size:11px;color:#888;margin-top:20px;">
+        YouTube blocking downloads? <a href="https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp" target="_blank" style="color:#4ea3ff;">Learn how to export cookies</a>
+    </p>
 </div>
 
 <script>
 async function start() {
     const url = document.getElementById("url").value;
+    const cookies = document.getElementById("cookies").value;
     const status = document.getElementById("status");
 
     status.textContent = "Processing...";
 
     const form = new FormData();
     form.append("url", url);
+    form.append("cookies", cookies);
 
     try {
         const res = await fetch("/api/download", {
