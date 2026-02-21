@@ -4,6 +4,7 @@ from fastapi.staticfiles import StaticFiles
 import yt_dlp
 import uuid
 import os
+import re
 
 app = FastAPI()
 
@@ -40,6 +41,7 @@ async def download_video(url: str = Form(...), cookies: str = Form("")):
     if cookies_file:
         opts["cookiefile"] = cookies_file
 
+    # Try direct YouTube download first
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=True)
@@ -49,7 +51,35 @@ async def download_video(url: str = Form(...), cookies: str = Form("")):
         return JSONResponse({"file": f"/api/file/{filename}"})
 
     except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
+        error_msg = str(e)
+        
+        # If bot detection and it's a YouTube URL, try Invidious
+        if ("Sign in to confirm" in error_msg or "bot" in error_msg.lower()) and "youtube.com" in url:
+            # Extract video ID
+            video_id_match = re.search(r'(?:v=|/)([a-zA-Z0-9_-]{11})', url)
+            if video_id_match:
+                video_id = video_id_match.group(1)
+                invidious_url = f"https://invidious.jing.rocks/watch?v={video_id}"
+                
+                try:
+                    opts_inv = {
+                        "outtmpl": template,
+                        "format": "best",
+                        "noplaylist": True,
+                        "quiet": True,
+                    }
+                    
+                    with yt_dlp.YoutubeDL(opts_inv) as ydl:
+                        info = ydl.extract_info(invidious_url, download=True)
+                        ext = info.get("ext", "mp4")
+
+                    filename = f"{file_id}.{ext}"
+                    return JSONResponse({"file": f"/api/file/{filename}"})
+                    
+                except Exception as inv_error:
+                    return JSONResponse({"error": f"YouTube blocked and Invidious failed: {str(inv_error)}. Try providing cookies."}, status_code=500)
+        
+        return JSONResponse({"error": f"{error_msg}. For YouTube, try providing cookies."}, status_code=500)
     
     finally:
         # Clean up cookies file
