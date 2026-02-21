@@ -40,7 +40,10 @@ button {
 <body>
 
 <div class="container">
-    <h2>Video Downloader</h2>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <h2 style="margin:0;">Video Downloader</h2>
+        <button onclick="logout()" style="padding:6px 12px;font-size:12px;background:#ff5555;border:none;border-radius:4px;color:white;cursor:pointer;">Logout</button>
+    </div>
 
     <input id="url" placeholder="Paste video URL">
     <br>
@@ -76,6 +79,10 @@ async function start() {
         const data = await res.json();
 
         if (data.error) {
+            if (data.error === "Unauthorized") {
+                window.location.href = "/";
+                return;
+            }
             status.textContent = data.error;
             return;
         }
@@ -85,6 +92,15 @@ async function start() {
 
     } catch {
         status.textContent = "Request failed";
+    }
+}
+
+async function logout() {
+    try {
+        await fetch("/api/logout", { method: "POST" });
+        window.location.href = "/";
+    } catch {
+        window.location.href = "/";
     }
 }
 </script>

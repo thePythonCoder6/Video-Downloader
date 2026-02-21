@@ -1,19 +1,64 @@
-from fastapi import FastAPI, Form
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi import FastAPI, Form, Cookie, Response as FastAPIResponse
+from fastapi.responses import FileResponse, JSONResponse, Response, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 import yt_dlp
 import uuid
 import os
 import re
+import hashlib
+import secrets
 
 app = FastAPI()
 
 DOWNLOAD_DIR = "downloads"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
+# Login credentials
+USERNAME = "thepythoncoder6"  # Case insensitive
+PASSWORD = "Qwertyuiop!"
+
+# Session storage (in-memory)
+active_sessions = set()
+
+
+@app.post("/api/login")
+async def login(username: str = Form(...), password: str = Form(...)):
+    if username.lower() == USERNAME and password == PASSWORD:
+        # Generate session token
+        session_token = secrets.token_urlsafe(32)
+        active_sessions.add(session_token)
+        
+        response = JSONResponse({"success": True})
+        response.set_cookie(
+            key="session",
+            value=session_token,
+            httponly=True,
+            max_age=86400,  # 24 hours
+            samesite="lax"
+        )
+        return response
+    
+    return JSONResponse({"error": "Invalid credentials"}, status_code=401)
+
+
+@app.post("/api/logout")
+async def logout(session: str = Cookie(None)):
+    if session in active_sessions:
+        active_sessions.remove(session)
+    
+    response = JSONResponse({"success": True})
+    response.delete_cookie("session")
+    return response
+
+
+def check_auth(session: str = Cookie(None)):
+    return session and session in active_sessions
+
 
 @app.post("/api/download")
-async def download_video(url: str = Form(...), cookies: str = Form("")):
+async def download_video(url: str = Form(...), cookies: str = Form(""), session: str = Cookie(None)):
+    if not check_auth(session):
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
     file_id = str(uuid.uuid4())
     template = os.path.join(DOWNLOAD_DIR, f"{file_id}.%(ext)s")
     cookies_file = None
@@ -101,10 +146,17 @@ async def get_file(filename: str):
 
 
 @app.get("/")
-async def index():
+async def index(session: str = Cookie(None)):
+    if not check_auth(session):
+        return FileResponse("static/login.html")
     return FileResponse("static/index.html")
 
 
 @app.head("/")
 async def head_index():
     return Response(status_code=200)
+
+
+@app.get("/api/check-auth")
+async def check_auth_endpoint(session: str = Cookie(None)):
+    return JSONResponse({"authenticated": check_auth(session)})

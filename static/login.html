@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Login - Video Downloader</title>
+
+<style>
+body {
+    margin:0;
+    font-family: Arial, sans-serif;
+    background:#121212;
+    color:white;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    height:100vh;
+}
+
+.container {
+    background:#1e1e1e;
+    padding:40px;
+    border-radius:12px;
+    box-shadow:0 0 20px rgba(0,0,0,0.4);
+    text-align:center;
+    min-width:320px;
+}
+
+input {
+    width:100%;
+    padding:12px;
+    margin:10px 0;
+    background:#2a2a2a;
+    border:1px solid #444;
+    border-radius:6px;
+    color:white;
+    font-size:14px;
+    box-sizing:border-box;
+}
+
+input:focus {
+    outline:none;
+    border-color:#4ea3ff;
+}
+
+button {
+    width:100%;
+    padding:12px;
+    margin:15px 0 5px 0;
+    background:#4ea3ff;
+    border:none;
+    border-radius:6px;
+    color:white;
+    font-size:15px;
+    font-weight:bold;
+    cursor:pointer;
+    transition:background 0.3s;
+}
+
+button:hover {
+    background:#3d8dd9;
+}
+
+button:disabled {
+    background:#555;
+    cursor:not-allowed;
+}
+
+.error {
+    color:#ff5555;
+    margin-top:10px;
+    font-size:13px;
+}
+
+h2 {
+    margin-top:0;
+    color:#4ea3ff;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+    <h2>🔒 Login Required</h2>
+    
+    <form onsubmit="handleLogin(event)">
+        <input 
+            type="text" 
+            id="username" 
+            placeholder="Username" 
+            required
+            autocomplete="username"
+        >
+        <input 
+            type="password" 
+            id="password" 
+            placeholder="Password" 
+            required
+            autocomplete="current-password"
+        >
+        <button type="submit" id="loginBtn">Login</button>
+    </form>
+    
+    <p id="error" class="error"></p>
+</div>
+
+<script>
+async function handleLogin(event) {
+    event.preventDefault();
+    
+    const username = document.getElementById("username").value;
+    const password = document.getElementById("password").value;
+    const errorEl = document.getElementById("error");
+    const loginBtn = document.getElementById("loginBtn");
+    
+    errorEl.textContent = "";
+    loginBtn.disabled = true;
+    loginBtn.textContent = "Logging in...";
+    
+    const form = new FormData();
+    form.append("username", username);
+    form.append("password", password);
+    
+    try {
+        const res = await fetch("/api/login", {
+            method: "POST",
+            body: form
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+            window.location.href = "/";
+        } else {
+            errorEl.textContent = data.error || "Invalid credentials";
+            loginBtn.disabled = false;
+            loginBtn.textContent = "Login";
+        }
+    } catch (err) {
+        errorEl.textContent = "Login failed. Please try again.";
+        loginBtn.disabled = false;
+        loginBtn.textContent = "Login";
+    }
+}
+</script>
+
+</body>
+</html>
