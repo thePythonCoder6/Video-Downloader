@@ -285,6 +285,54 @@ async def download_video(url: str = Form(...), cookies: str = Form(""), format: 
                     "https://inv.riverside.rocks",
                 ]
                 
+                # Strategy 1: Try youtube-nocookie domain
+                try:
+                    nocookie_url = url.replace("youtube.com", "youtube-nocookie.com")
+                    print(f"🔄 Trying youtube-nocookie: {nocookie_url}")
+                    
+                    opts_nocookie = {
+                        "outtmpl": template,
+                        "format": "best",
+                        "noplaylist": True,
+                        "quiet": True,
+                        "socket_timeout": 30,
+                        "extractor_args": {
+                            "youtube": {
+                                "player_client": ["tv_embedded"],
+                            }
+                        },
+                    }
+                    
+                    with yt_dlp.YoutubeDL(opts_nocookie) as ydl:
+                        info = ydl.extract_info(nocookie_url, download=True)
+                        ext = info.get("ext", "mp4")
+
+                    filename = f"{file_id}.{ext}"
+                    
+                    # Add to history
+                    history = load_history()
+                    history_item = {
+                        "id": file_id,
+                        "url": url,
+                        "file": f"/api/file/{filename}",
+                        "filename": filename,
+                        "timestamp": datetime.now().isoformat(),
+                        "title": extract_title_from_info(info)
+                    }
+                    history.insert(0, history_item)
+                    
+                    if len(history) > 50:
+                        history = history[:50]
+                    
+                    save_history_data(history)
+                    
+                    print(f"✅ Successfully downloaded via youtube-nocookie")
+                    return JSONResponse({"file": f"/api/file/{filename}", "id": file_id})
+                    
+                except Exception as nocookie_error:
+                    print(f"❌ youtube-nocookie failed: {nocookie_error}")
+                
+                # Strategy 2: Try Invidious instances
                 last_inv_error = None
                 for instance in invidious_instances:
                     try:
@@ -330,8 +378,8 @@ async def download_video(url: str = Form(...), cookies: str = Form(""), format: 
                         print(f"❌ {instance} failed: {inv_error}")
                         continue  # Try next instance
                 
-                # All instances failed
-                return JSONResponse({"error": f"YouTube blocked and all Invidious instances failed. Last error: {last_inv_error}. Try providing cookies."}, status_code=500)
+                # All strategies failed
+                return JSONResponse({"error": f"YouTube blocked. Tried youtube-nocookie and all Invidious instances. Last error: {last_inv_error}. Try providing cookies."}, status_code=500)
         
         return JSONResponse({"error": f"{error_msg}. For YouTube, try providing cookies."}, status_code=500)
     
