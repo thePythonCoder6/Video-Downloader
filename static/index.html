@@ -173,52 +173,18 @@ button {
 let currentVideoFile = null;
 let downloadHistory = [];
 
-// Load history from localStorage
-function loadHistory() {
-    const saved = localStorage.getItem('videoHistory');
-    if (saved) {
-        downloadHistory = JSON.parse(saved);
-        renderHistory();
-    }
-}
-
-// Save history to localStorage
-function saveHistory() {
-    localStorage.setItem('videoHistory', JSON.stringify(downloadHistory));
-}
-
-// Add video to history
-function addToHistory(url, file) {
-    const historyItem = {
-        url: url,
-        file: file,
-        timestamp: new Date().toISOString(),
-        title: extractTitle(url)
-    };
-    
-    // Add to beginning of array
-    downloadHistory.unshift(historyItem);
-    
-    // Keep only last 20 videos
-    if (downloadHistory.length > 20) {
-        downloadHistory = downloadHistory.slice(0, 20);
-    }
-    
-    saveHistory();
-    renderHistory();
-}
-
-// Extract title from URL
-function extractTitle(url) {
+// Load history from server
+async function loadHistory() {
     try {
-        const urlObj = new URL(url);
-        if (urlObj.hostname.includes('youtube.com') || urlObj.hostname.includes('youtu.be')) {
-            const videoId = urlObj.searchParams.get('v') || urlObj.pathname.split('/').pop();
-            return `YouTube Video (${videoId})`;
+        const res = await fetch('/api/history');
+        const data = await res.json();
+        
+        if (data.history) {
+            downloadHistory = data.history;
+            renderHistory();
         }
-        return urlObj.hostname;
-    } catch {
-        return 'Video';
+    } catch (err) {
+        console.error('Failed to load history:', err);
     }
 }
 
@@ -248,19 +214,26 @@ function renderHistory() {
         return;
     }
     
-    historyList.innerHTML = downloadHistory.map((item, index) => `
+    historyList.innerHTML = downloadHistory.map((item) => `
         <div class="history-item">
             <div class="history-info">
-                <div class="history-title">${item.title}</div>
+                <div class="history-title">${escapeHtml(item.title)}</div>
                 <div class="history-date">${formatDate(item.timestamp)}</div>
             </div>
             <div class="history-buttons">
                 <button onclick="playHistoryVideo('${item.file}')" style="background:#4ea3ff;color:white;">▶️ Watch</button>
                 <button onclick="downloadHistoryVideo('${item.file}')" style="background:#2ecc71;color:white;">⬇️</button>
-                <button onclick="deleteHistoryItem(${index})" style="background:#ff5555;color:white;">🗑️</button>
+                <button onclick="deleteHistoryItem('${item.id}')" style="background:#ff5555;color:white;">🗑️</button>
             </div>
         </div>
     `).join('');
+}
+
+// Escape HTML to prevent XSS
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 // Play video from history
@@ -275,20 +248,38 @@ function downloadHistoryVideo(file) {
 }
 
 // Delete history item
-function deleteHistoryItem(index) {
-    if (confirm('Remove this video from history?')) {
-        downloadHistory.splice(index, 1);
-        saveHistory();
-        renderHistory();
+async function deleteHistoryItem(videoId) {
+    if (confirm('Remove this video from history? This will also delete the file.')) {
+        try {
+            const res = await fetch(`/api/history/${videoId}`, {
+                method: 'DELETE'
+            });
+            
+            if (res.ok) {
+                // Reload history from server
+                await loadHistory();
+            }
+        } catch (err) {
+            alert('Failed to delete video');
+        }
     }
 }
 
 // Clear all history
-function clearAllHistory() {
-    if (confirm('Clear all download history?')) {
-        downloadHistory = [];
-        saveHistory();
-        renderHistory();
+async function clearAllHistory() {
+    if (confirm('Clear all download history? This will delete all video files.')) {
+        try {
+            const res = await fetch('/api/history/clear', {
+                method: 'POST'
+            });
+            
+            if (res.ok) {
+                downloadHistory = [];
+                renderHistory();
+            }
+        } catch (err) {
+            alert('Failed to clear history');
+        }
     }
 }
 
@@ -325,8 +316,8 @@ async function start() {
 
         currentVideoFile = data.file;
         
-        // Add to history
-        addToHistory(url, data.file);
+        // Reload history from server
+        await loadHistory();
         
         status.innerHTML = `
             <button onclick="playVideo()" style="background:#4ea3ff;border:none;border-radius:6px;color:white;padding:10px 20px;margin:5px;cursor:pointer;font-size:14px;">▶️ Watch Now</button>

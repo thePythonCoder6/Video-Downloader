@@ -10,6 +10,7 @@ import secrets
 import bcrypt
 import json
 from pathlib import Path
+from datetime import datetime
 
 app = FastAPI()
 
@@ -69,6 +70,45 @@ def save_sessions():
         pass
 
 active_sessions = load_sessions()
+
+# Download history storage
+HISTORY_FILE = os.path.join(DOWNLOAD_DIR, ".history.json")
+
+def load_history():
+    if os.path.exists(HISTORY_FILE):
+        try:
+            with open(HISTORY_FILE, "r") as f:
+                return json.load(f)
+        except:
+            return []
+    return []
+
+def save_history_data(history):
+    try:
+        with open(HISTORY_FILE, "w") as f:
+            json.dump(history, f, indent=2)
+    except:
+        pass
+
+def extract_title_from_info(info):
+    """Extract video title from yt-dlp info"""
+    if not info:
+        return "Video"
+    
+    title = info.get('title', '')
+    if title:
+        return title[:100]  # Limit length
+    
+    # Fallback to uploader or video ID
+    uploader = info.get('uploader', '')
+    video_id = info.get('id', '')
+    
+    if uploader and video_id:
+        return f"{uploader} - {video_id}"
+    elif video_id:
+        return f"Video {video_id}"
+    
+    return "Video"
 
 
 @app.post("/api/login")
@@ -146,7 +186,26 @@ async def download_video(url: str = Form(...), cookies: str = Form(""), session:
             ext = info.get("ext", "mp4")
 
         filename = f"{file_id}.{ext}"
-        return JSONResponse({"file": f"/api/file/{filename}"})
+        
+        # Add to history
+        history = load_history()
+        history_item = {
+            "id": file_id,
+            "url": url,
+            "file": f"/api/file/{filename}",
+            "filename": filename,
+            "timestamp": datetime.now().isoformat(),
+            "title": extract_title_from_info(info)
+        }
+        history.insert(0, history_item)  # Add to beginning
+        
+        # Keep only last 50 videos
+        if len(history) > 50:
+            history = history[:50]
+        
+        save_history_data(history)
+        
+        return JSONResponse({"file": f"/api/file/{filename}", "id": file_id})
 
     except Exception as e:
         error_msg = str(e)
@@ -172,7 +231,25 @@ async def download_video(url: str = Form(...), cookies: str = Form(""), session:
                         ext = info.get("ext", "mp4")
 
                     filename = f"{file_id}.{ext}"
-                    return JSONResponse({"file": f"/api/file/{filename}"})
+                    
+                    # Add to history
+                    history = load_history()
+                    history_item = {
+                        "id": file_id,
+                        "url": url,
+                        "file": f"/api/file/{filename}",
+                        "filename": filename,
+                        "timestamp": datetime.now().isoformat(),
+                        "title": extract_title_from_info(info)
+                    }
+                    history.insert(0, history_item)
+                    
+                    if len(history) > 50:
+                        history = history[:50]
+                    
+                    save_history_data(history)
+                    
+                    return JSONResponse({"file": f"/api/file/{filename}", "id": file_id})
                     
                 except Exception as inv_error:
                     return JSONResponse({"error": f"YouTube blocked and Invidious failed: {str(inv_error)}. Try providing cookies."}, status_code=500)
@@ -208,6 +285,72 @@ async def index(session: str = Cookie(None)):
 @app.head("/")
 async def head_index():
     return Response(status_code=200)
+
+
+@app.get("/api/history")
+async def get_history(session: str = Cookie(None)):
+    if not check_auth(session):
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    
+    history = load_history()
+    return JSONResponse({"history": history})
+
+
+@app.delete("/api/history/{video_id}")
+async def delete_history_item(video_id: str, session: str = Cookie(None)):
+    if not check_auth(session):
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    
+    history = load_history()
+    
+    # Find the item to delete
+    item_to_delete = None
+    for item in history:
+        if item.get("id") == video_id:
+            item_to_delete = item
+            break
+    
+    # Remove from history
+    history = [item for item in history if item.get("id") != video_id]
+    save_history_data(history)
+    
+    # Delete the actual file
+    if item_to_delete:
+        filename = item_to_delete.get("filename")
+        if filename:
+            file_path = os.path.join(DOWNLOAD_DIR, filename)
+            try:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+            except:
+                pass
+    
+    return JSONResponse({"success": True})
+
+
+@app.post("/api/history/clear")
+async def clear_history(session: str = Cookie(None)):
+    if not check_auth(session):
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    
+    # Get all files from history before clearing
+    history = load_history()
+    
+    # Delete all video files
+    for item in history:
+        filename = item.get("filename")
+        if filename:
+            file_path = os.path.join(DOWNLOAD_DIR, filename)
+            try:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+            except:
+                pass
+    
+    # Clear history
+    save_history_data([])
+    
+    return JSONResponse({"success": True})
 
 
 @app.get("/api/check-auth")
