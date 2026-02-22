@@ -62,6 +62,71 @@ button {
     gap:10px;
     justify-content:center;
 }
+
+#historyContainer {
+    background:#1e1e1e;
+    padding:20px;
+    border-radius:12px;
+    box-shadow:0 0 20px rgba(0,0,0,0.4);
+    max-width:800px;
+    width:100%;
+    margin-top:20px;
+}
+
+#historyContainer h3 {
+    margin-top:0;
+    color:#4ea3ff;
+}
+
+.history-item {
+    background:#2a2a2a;
+    padding:15px;
+    margin:10px 0;
+    border-radius:8px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    border:1px solid #333;
+}
+
+.history-item:hover {
+    border-color:#4ea3ff;
+}
+
+.history-info {
+    flex:1;
+    text-align:left;
+    margin-right:15px;
+}
+
+.history-title {
+    font-weight:bold;
+    margin-bottom:5px;
+    color:#fff;
+}
+
+.history-date {
+    font-size:11px;
+    color:#888;
+}
+
+.history-buttons {
+    display:flex;
+    gap:8px;
+}
+
+.history-buttons button {
+    padding:8px 12px;
+    font-size:12px;
+    border:none;
+    border-radius:4px;
+    cursor:pointer;
+}
+
+.empty-history {
+    color:#888;
+    font-style:italic;
+}
 </style>
 </head>
 
@@ -97,8 +162,138 @@ button {
     </div>
 </div>
 
+<div id="historyContainer">
+    <h3>📼 Download History</h3>
+    <div id="historyList">
+        <p class="empty-history">No videos downloaded yet</p>
+    </div>
+</div>
+
 <script>
 let currentVideoFile = null;
+let downloadHistory = [];
+
+// Load history from localStorage
+function loadHistory() {
+    const saved = localStorage.getItem('videoHistory');
+    if (saved) {
+        downloadHistory = JSON.parse(saved);
+        renderHistory();
+    }
+}
+
+// Save history to localStorage
+function saveHistory() {
+    localStorage.setItem('videoHistory', JSON.stringify(downloadHistory));
+}
+
+// Add video to history
+function addToHistory(url, file) {
+    const historyItem = {
+        url: url,
+        file: file,
+        timestamp: new Date().toISOString(),
+        title: extractTitle(url)
+    };
+    
+    // Add to beginning of array
+    downloadHistory.unshift(historyItem);
+    
+    // Keep only last 20 videos
+    if (downloadHistory.length > 20) {
+        downloadHistory = downloadHistory.slice(0, 20);
+    }
+    
+    saveHistory();
+    renderHistory();
+}
+
+// Extract title from URL
+function extractTitle(url) {
+    try {
+        const urlObj = new URL(url);
+        if (urlObj.hostname.includes('youtube.com') || urlObj.hostname.includes('youtu.be')) {
+            const videoId = urlObj.searchParams.get('v') || urlObj.pathname.split('/').pop();
+            return `YouTube Video (${videoId})`;
+        }
+        return urlObj.hostname;
+    } catch {
+        return 'Video';
+    }
+}
+
+// Format date
+function formatDate(isoString) {
+    const date = new Date(isoString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins} min ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    
+    return date.toLocaleDateString();
+}
+
+// Render history list
+function renderHistory() {
+    const historyList = document.getElementById('historyList');
+    
+    if (downloadHistory.length === 0) {
+        historyList.innerHTML = '<p class="empty-history">No videos downloaded yet</p>';
+        return;
+    }
+    
+    historyList.innerHTML = downloadHistory.map((item, index) => `
+        <div class="history-item">
+            <div class="history-info">
+                <div class="history-title">${item.title}</div>
+                <div class="history-date">${formatDate(item.timestamp)}</div>
+            </div>
+            <div class="history-buttons">
+                <button onclick="playHistoryVideo('${item.file}')" style="background:#4ea3ff;color:white;">▶️ Watch</button>
+                <button onclick="downloadHistoryVideo('${item.file}')" style="background:#2ecc71;color:white;">⬇️</button>
+                <button onclick="deleteHistoryItem(${index})" style="background:#ff5555;color:white;">🗑️</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Play video from history
+function playHistoryVideo(file) {
+    currentVideoFile = file;
+    playVideo();
+}
+
+// Download video from history
+function downloadHistoryVideo(file) {
+    window.location.href = file;
+}
+
+// Delete history item
+function deleteHistoryItem(index) {
+    if (confirm('Remove this video from history?')) {
+        downloadHistory.splice(index, 1);
+        saveHistory();
+        renderHistory();
+    }
+}
+
+// Clear all history
+function clearAllHistory() {
+    if (confirm('Clear all download history?')) {
+        downloadHistory = [];
+        saveHistory();
+        renderHistory();
+    }
+}
+
+// Load history on page load
+loadHistory();
 
 async function start() {
     const url = document.getElementById("url").value;
@@ -129,6 +324,10 @@ async function start() {
         }
 
         currentVideoFile = data.file;
+        
+        // Add to history
+        addToHistory(url, data.file);
+        
         status.innerHTML = `
             <button onclick="playVideo()" style="background:#4ea3ff;border:none;border-radius:6px;color:white;padding:10px 20px;margin:5px;cursor:pointer;font-size:14px;">▶️ Watch Now</button>
             <a href="${data.file}" style="color:#4ea3ff;text-decoration:none;padding:10px 20px;margin:5px;display:inline-block;">⬇️ Download</a>
