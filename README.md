@@ -13,48 +13,35 @@ A secure video downloader service with authentication and YouTube bot detection 
 
 ## Setup
 
-### Environment Variables
+### Render Secret File Setup
 
-For production, set these environment variables:
+1. Create a file named `credentials.json` with your credentials:
+   ```json
+   {
+     "username": "your_username",
+     "password": "your_password"
+   }
+   ```
 
-```bash
-# Required for custom credentials
-LOGIN_USERNAME=your_username
-LOGIN_PASSWORD_HASH=your_bcrypt_hash
+2. On Render.com:
+   - Go to your service dashboard
+   - Navigate to **"Secret Files"** section
+   - Click **"Add Secret File"**
+   - Set **Filename:** `/etc/secrets/credentials`
+   - Paste the contents of your `credentials.json`
+   - Click **"Save"**
 
-# Or use plain password (will be hashed on startup)
-LOGIN_USERNAME=your_username
-LOGIN_PASSWORD=your_password
-```
+3. Redeploy your service
 
-### Generate Password Hash
-
-To generate a bcrypt hash for your password, run:
-
-```python
-import bcrypt
-password = "YourSecurePassword123!"
-hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
-print(hash)
-```
-
-Or the app will generate one on first startup and print it to the console.
-
-### Render.com Setup
-
-1. Go to your Render service dashboard
-2. Navigate to "Environment" section
-3. Add environment variables:
-   - `LOGIN_USERNAME` = `your_username`
-   - `LOGIN_PASSWORD_HASH` = `$2b$12$...` (your bcrypt hash)
+The password will be automatically hashed with bcrypt on startup.
 
 ### Default Credentials
 
-If no environment variables are set:
+If no secret file is configured:
 - **Username:** `thepythoncoder6` (case insensitive)
 - **Password:** `Qwertyuiop!`
 
-⚠️ **Change these for production!**
+⚠️ **Change these for production using Render Secret Files!**
 
 ## Installation
 
@@ -78,7 +65,7 @@ uvicorn server:app --host 0.0.0.0 --port 8000
 
 - ✅ Bcrypt password hashing (not plaintext)
 - ✅ Secure httponly session cookies
-- ✅ Environment variable configuration
+- ✅ Render Secret Files for credential storage
 - ✅ Persistent session storage across restarts
 - ✅ 24-hour session expiry
 - ✅ Server-side authentication validation

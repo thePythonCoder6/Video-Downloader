@@ -16,16 +16,29 @@ app = FastAPI()
 DOWNLOAD_DIR = "downloads"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
-# Login credentials from environment variables (with fallback for first run)
-USERNAME = os.getenv("LOGIN_USERNAME", "thepythoncoder6").lower()  # Case insensitive
-PASSWORD_HASH = os.getenv("LOGIN_PASSWORD_HASH", None)
+# Load credentials from Render Secret File
+SECRETS_FILE = "/etc/secrets/credentials"
 
-# If no hash in env, hash the default password on first run
-if not PASSWORD_HASH:
-    default_password = os.getenv("LOGIN_PASSWORD", "Qwertyuiop!")
-    PASSWORD_HASH = bcrypt.hashpw(default_password.encode(), bcrypt.gensalt()).decode()
-    print(f"⚠️  Using default credentials. Set LOGIN_USERNAME and LOGIN_PASSWORD_HASH env vars for production.")
-    print(f"⚠️  Generated hash for current password: {PASSWORD_HASH}")
+def load_credentials():
+    """Load credentials from Render secret file"""
+    try:
+        if os.path.exists(SECRETS_FILE):
+            with open(SECRETS_FILE, "r") as f:
+                secrets_data = json.load(f)
+                username = secrets_data.get("username", "thepythoncoder6")
+                password = secrets_data.get("password", "Qwertyuiop!")
+                print(f"✅ Loaded credentials from {SECRETS_FILE}")
+                return username.lower(), password
+    except Exception as e:
+        print(f"⚠️  Error loading secret file: {e}")
+    
+    # Fallback to default
+    print(f"⚠️  Using default credentials")
+    return "thepythoncoder6", "Qwertyuiop!"
+
+USERNAME, DEFAULT_PASSWORD = load_credentials()
+PASSWORD_HASH = bcrypt.hashpw(DEFAULT_PASSWORD.encode(), bcrypt.gensalt()).decode()
+print(f"✅ Username: {USERNAME}")
 
 # Session storage (persistent file-based)
 SESSION_FILE = os.path.join(DOWNLOAD_DIR, ".sessions.json")
