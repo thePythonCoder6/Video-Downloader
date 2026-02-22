@@ -152,9 +152,23 @@ button {
     <input id="url" placeholder="Paste video URL">
     <br>
     <select id="format">
-        <option value="video">Video (MP4)</option>
-        <option value="mp3">Audio (MP3)</option>
-        <option value="m4a">Audio (M4A)</option>
+        <optgroup label="Video Formats">
+            <option value="mp4" selected>MP4 (Best Quality)</option>
+            <option value="webm">WebM</option>
+            <option value="mkv">MKV</option>
+            <option value="avi">AVI</option>
+            <option value="mov">MOV</option>
+            <option value="flv">FLV</option>
+        </optgroup>
+        <optgroup label="Audio Formats">
+            <option value="mp3">MP3 (192kbps)</option>
+            <option value="m4a">M4A (192kbps)</option>
+            <option value="wav">WAV (Lossless)</option>
+            <option value="flac">FLAC (Lossless)</option>
+            <option value="aac">AAC (192kbps)</option>
+            <option value="opus">Opus (192kbps)</option>
+            <option value="vorbis">Vorbis/OGG (192kbps)</option>
+        </optgroup>
     </select>
     <br>
     <textarea id="cookies" placeholder="Paste cookies (optional - for YouTube bot protection)" rows="4" style="width:320px;margin:10px 0;padding:10px;font-size:12px;"></textarea>
@@ -339,7 +353,8 @@ async function start() {
         await loadHistory();
         
         const format = document.getElementById("format").value;
-        const isAudio = format === 'mp3' || format === 'm4a';
+        const audioFormats = ['mp3', 'm4a', 'wav', 'flac', 'aac', 'opus', 'vorbis'];
+        const isAudio = audioFormats.includes(format);
         
         if (isAudio) {
             status.innerHTML = `

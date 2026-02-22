@@ -149,7 +149,7 @@ def check_auth(session: str = Cookie(None)):
 
 
 @app.post("/api/download")
-async def download_video(url: str = Form(...), cookies: str = Form(""), format: str = Form("video"), session: str = Cookie(None)):
+async def download_video(url: str = Form(...), cookies: str = Form(""), format: str = Form("mp4"), session: str = Cookie(None)):
     if not check_auth(session):
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
     file_id = str(uuid.uuid4())
@@ -163,7 +163,12 @@ async def download_video(url: str = Form(...), cookies: str = Form(""), format: 
             f.write(cookies.strip())
 
     # Configure format based on user selection
-    if format == "mp3":
+    audio_formats = ['mp3', 'm4a', 'wav', 'flac', 'aac', 'opus', 'vorbis']
+    video_formats = ['mp4', 'webm', 'mkv', 'avi', 'mov', 'flv']
+    
+    if format in audio_formats:
+        # Audio extraction
+        quality = "0" if format in ['wav', 'flac'] else "192"
         opts = {
             "outtmpl": template,
             "format": "bestaudio/best",
@@ -172,8 +177,8 @@ async def download_video(url: str = Form(...), cookies: str = Form(""), format: 
             "no_warnings": True,
             "postprocessors": [{
                 "key": "FFmpegExtractAudio",
-                "preferredcodec": "mp3",
-                "preferredquality": "192",
+                "preferredcodec": format if format != 'vorbis' else 'vorbis',
+                "preferredquality": quality,
             }],
             "extractor_args": {
                 "youtube": {
@@ -181,25 +186,41 @@ async def download_video(url: str = Form(...), cookies: str = Form(""), format: 
                 }
             },
         }
-    elif format == "m4a":
-        opts = {
-            "outtmpl": template,
-            "format": "bestaudio/best",
-            "noplaylist": True,
-            "quiet": True,
-            "no_warnings": True,
-            "postprocessors": [{
-                "key": "FFmpegExtractAudio",
-                "preferredcodec": "m4a",
-                "preferredquality": "192",
-            }],
-            "extractor_args": {
-                "youtube": {
-                    "player_client": ["tv_embedded"],
-                }
-            },
-        }
-    else:  # video
+    elif format in video_formats:
+        # Video conversion
+        if format == "mp4":
+            opts = {
+                "outtmpl": template,
+                "format": "best",
+                "noplaylist": True,
+                "quiet": True,
+                "no_warnings": True,
+                "extractor_args": {
+                    "youtube": {
+                        "player_client": ["tv_embedded"],
+                    }
+                },
+            }
+        else:
+            # For other video formats, download and convert
+            opts = {
+                "outtmpl": template,
+                "format": "best",
+                "noplaylist": True,
+                "quiet": True,
+                "no_warnings": True,
+                "postprocessors": [{
+                    "key": "FFmpegVideoConvertor",
+                    "preferedformat": format,
+                }],
+                "extractor_args": {
+                    "youtube": {
+                        "player_client": ["tv_embedded"],
+                    }
+                },
+            }
+    else:
+        # Default to MP4
         opts = {
             "outtmpl": template,
             "format": "best",
