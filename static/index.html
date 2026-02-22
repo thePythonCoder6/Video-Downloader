@@ -116,6 +116,18 @@ button {
     color:#fff;
 }
 
+.history-url {
+    font-size:11px;
+    color:#4ea3ff;
+    margin-bottom:3px;
+    word-break:break-all;
+    cursor:pointer;
+}
+
+.history-url:hover {
+    text-decoration:underline;
+}
+
 .history-date {
     font-size:11px;
     color:#888;
@@ -249,6 +261,7 @@ function renderHistory() {
         <div class="history-item">
             <div class="history-info">
                 <div class="history-title">${escapeHtml(item.title)}</div>
+                <div class="history-url" onclick="copyToClipboard('${escapeHtml(item.url).replace(/'/g, "&#39;")}')" title="Click to copy URL">🔗 ${truncateUrl(item.url)}</div>
                 <div class="history-date">${formatDate(item.timestamp)}</div>
             </div>
             <div class="history-buttons">
@@ -258,6 +271,51 @@ function renderHistory() {
             </div>
         </div>
     `).join('');
+}
+
+// Truncate URL for display
+function truncateUrl(url) {
+    if (url.length > 60) {
+        return url.substring(0, 57) + '...';
+    }
+    return url;
+}
+
+// Copy URL to clipboard
+function copyToClipboard(url) {
+    // Decode HTML entities
+    const textarea = document.createElement('textarea');
+    textarea.innerHTML = url;
+    const decodedUrl = textarea.value;
+    
+    navigator.clipboard.writeText(decodedUrl).then(() => {
+        // Show brief notification
+        const notification = document.createElement('div');
+        notification.textContent = '✅ URL copied!';
+        notification.style.cssText = 'position:fixed;top:20px;right:20px;background:#2ecc71;color:white;padding:12px 20px;border-radius:8px;z-index:9999;animation:fadeIn 0.3s;';
+        document.body.appendChild(notification);
+        setTimeout(() => {
+            notification.style.animation = 'fadeOut 0.3s';
+            setTimeout(() => notification.remove(), 300);
+        }, 2000);
+    }).catch(() => {
+        alert('Failed to copy URL');
+    });
+}
+
+// Add fade animations
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeOut {
+        from { opacity: 1; transform: translateY(0); }
+        to { opacity: 0; transform: translateY(-10px); }
+    }
+`;
+document.head.appendChild(style)
 }
 
 // Escape HTML to prevent XSS
