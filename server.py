@@ -182,7 +182,7 @@ async def download_video(url: str = Form(...), cookies: str = Form(""), format: 
             }],
             "extractor_args": {
                 "youtube": {
-                    "player_client": ["tv_embedded"],
+                    "player_client": ["android_creator", "mediaconnect", "tv_embedded"],
                 }
             },
         }
@@ -229,7 +229,7 @@ async def download_video(url: str = Form(...), cookies: str = Form(""), format: 
             "no_warnings": True,
             "extractor_args": {
                 "youtube": {
-                    "player_client": ["tv_embedded"],
+                    "player_client": ["android_creator", "mediaconnect", "tv_embedded"],
                 }
             },
         }
@@ -283,6 +283,11 @@ async def download_video(url: str = Form(...), cookies: str = Form(""), format: 
                     "https://yewtu.be",
                     "https://invidious.fdn.fr",
                     "https://inv.riverside.rocks",
+                    "https://iv.ggtyler.dev",
+                    "https://invidious.nerdvpn.de",
+                    "https://inv.tux.pizza",
+                    "https://invidious.private.coffee",
+                    "https://yt.artemislena.eu",
                 ]
                 
                 # Strategy 1: Try youtube-nocookie domain
@@ -296,11 +301,11 @@ async def download_video(url: str = Form(...), cookies: str = Form(""), format: 
                         "noplaylist": True,
                         "quiet": True,
                         "socket_timeout": 30,
-                        "extractor_args": {
-                            "youtube": {
-                                "player_client": ["tv_embedded"],
-                            }
-                        },
+                                    "extractor_args": {
+                "youtube": {
+                    "player_client": ["android_creator", "mediaconnect", "tv_embedded"],
+                }
+            },
                     }
                     
                     with yt_dlp.YoutubeDL(opts_nocookie) as ydl:
