@@ -11,9 +11,11 @@ body {
     background:#121212;
     color:white;
     display:flex;
+    flex-direction:column;
     align-items:center;
-    justify-content:center;
-    height:100vh;
+    justify-content:flex-start;
+    min-height:100vh;
+    padding:20px;
 }
 
 .container {
@@ -22,6 +24,9 @@ body {
     border-radius:12px;
     box-shadow:0 0 20px rgba(0,0,0,0.4);
     text-align:center;
+    margin-bottom:20px;
+    max-width:800px;
+    width:100%;
 }
 
 input {
@@ -33,6 +38,29 @@ input {
 button {
     padding:10px 18px;
     cursor:pointer;
+}
+
+#videoPlayer {
+    display:none;
+    background:#1e1e1e;
+    padding:20px;
+    border-radius:12px;
+    box-shadow:0 0 20px rgba(0,0,0,0.4);
+    max-width:800px;
+    width:100%;
+}
+
+#videoPlayer video {
+    width:100%;
+    max-width:100%;
+    border-radius:8px;
+}
+
+.video-controls {
+    margin-top:15px;
+    display:flex;
+    gap:10px;
+    justify-content:center;
 }
 </style>
 </head>
@@ -58,7 +86,20 @@ button {
     </p>
 </div>
 
+<div id="videoPlayer">
+    <video id="video" controls>
+        <source id="videoSource" type="video/mp4">
+        Your browser does not support the video tag.
+    </video>
+    <div class="video-controls">
+        <button onclick="downloadVideo()" style="background:#4ea3ff;border:none;border-radius:4px;color:white;cursor:pointer;">Download Video</button>
+        <button onclick="hideVideo()" style="background:#ff5555;border:none;border-radius:4px;color:white;cursor:pointer;">Close Player</button>
+    </div>
+</div>
+
 <script>
+let currentVideoFile = null;
+
 async function start() {
     const url = document.getElementById("url").value;
     const cookies = document.getElementById("cookies").value;
@@ -87,12 +128,43 @@ async function start() {
             return;
         }
 
-        status.innerHTML =
-            `<a href="${data.file}" style="color:#4ea3ff">Download file</a>`;
+        currentVideoFile = data.file;
+        status.innerHTML = `
+            <button onclick="playVideo()" style="background:#4ea3ff;border:none;border-radius:6px;color:white;padding:10px 20px;margin:5px;cursor:pointer;font-size:14px;">▶️ Watch Now</button>
+            <a href="${data.file}" style="color:#4ea3ff;text-decoration:none;padding:10px 20px;margin:5px;display:inline-block;">⬇️ Download</a>
+        `;
 
     } catch {
         status.textContent = "Request failed";
     }
+}
+
+function playVideo() {
+    if (!currentVideoFile) return;
+    
+    const videoPlayer = document.getElementById("videoPlayer");
+    const videoSource = document.getElementById("videoSource");
+    const video = document.getElementById("video");
+    
+    videoSource.src = currentVideoFile;
+    video.load();
+    videoPlayer.style.display = "block";
+    
+    // Scroll to video player
+    videoPlayer.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function hideVideo() {
+    const videoPlayer = document.getElementById("videoPlayer");
+    const video = document.getElementById("video");
+    
+    video.pause();
+    videoPlayer.style.display = "none";
+}
+
+function downloadVideo() {
+    if (!currentVideoFile) return;
+    window.location.href = currentVideoFile;
 }
 
 async function logout() {
@@ -103,6 +175,15 @@ async function logout() {
         window.location.href = "/";
     }
 }
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', () => {
+    const video = document.getElementById('video');
+    if (video) {
+        video.pause();
+        video.src = '';
+    }
+});
 </script>
 
 </body>
