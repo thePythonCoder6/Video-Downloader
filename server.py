@@ -149,7 +149,7 @@ def check_auth(session: str = Cookie(None)):
 
 
 @app.post("/api/download")
-async def download_video(url: str = Form(...), cookies: str = Form(""), session: str = Cookie(None)):
+async def download_video(url: str = Form(...), cookies: str = Form(""), format: str = Form("video"), session: str = Cookie(None)):
     if not check_auth(session):
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
     file_id = str(uuid.uuid4())
@@ -162,18 +162,56 @@ async def download_video(url: str = Form(...), cookies: str = Form(""), session:
         with open(cookies_file, "w") as f:
             f.write(cookies.strip())
 
-    opts = {
-        "outtmpl": template,
-        "format": "best",
-        "noplaylist": True,
-        "quiet": True,
-        "no_warnings": True,
-        "extractor_args": {
-            "youtube": {
-                "player_client": ["tv_embedded"],
-            }
-        },
-    }
+    # Configure format based on user selection
+    if format == "mp3":
+        opts = {
+            "outtmpl": template,
+            "format": "bestaudio/best",
+            "noplaylist": True,
+            "quiet": True,
+            "no_warnings": True,
+            "postprocessors": [{
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "mp3",
+                "preferredquality": "192",
+            }],
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["tv_embedded"],
+                }
+            },
+        }
+    elif format == "m4a":
+        opts = {
+            "outtmpl": template,
+            "format": "bestaudio/best",
+            "noplaylist": True,
+            "quiet": True,
+            "no_warnings": True,
+            "postprocessors": [{
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "m4a",
+                "preferredquality": "192",
+            }],
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["tv_embedded"],
+                }
+            },
+        }
+    else:  # video
+        opts = {
+            "outtmpl": template,
+            "format": "best",
+            "noplaylist": True,
+            "quiet": True,
+            "no_warnings": True,
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["tv_embedded"],
+                }
+            },
+        }
     
     # Add cookies file if provided
     if cookies_file:
