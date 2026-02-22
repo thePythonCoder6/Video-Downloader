@@ -21,16 +21,24 @@ SECRETS_FILE = "/etc/secrets/credentials"
 
 def load_credentials():
     """Load credentials from Render secret file"""
+    print(f"🔍 Looking for secret file at: {SECRETS_FILE}")
+    print(f"🔍 File exists: {os.path.exists(SECRETS_FILE)}")
+    
     try:
         if os.path.exists(SECRETS_FILE):
             with open(SECRETS_FILE, "r") as f:
-                secrets_data = json.load(f)
+                content = f.read()
+                print(f"🔍 File content length: {len(content)} bytes")
+                secrets_data = json.loads(content)
                 username = secrets_data.get("username", "thepythoncoder6")
                 password = secrets_data.get("password", "Qwertyuiop!")
                 print(f"✅ Loaded credentials from {SECRETS_FILE}")
+                print(f"✅ Username from file: {username}")
                 return username.lower(), password
     except Exception as e:
         print(f"⚠️  Error loading secret file: {e}")
+        import traceback
+        traceback.print_exc()
     
     # Fallback to default
     print(f"⚠️  Using default credentials")
@@ -38,7 +46,8 @@ def load_credentials():
 
 USERNAME, DEFAULT_PASSWORD = load_credentials()
 PASSWORD_HASH = bcrypt.hashpw(DEFAULT_PASSWORD.encode(), bcrypt.gensalt()).decode()
-print(f"✅ Username: {USERNAME}")
+print(f"✅ Final username (lowercase): {USERNAME}")
+print(f"✅ Password length: {len(DEFAULT_PASSWORD)} chars")
 
 # Session storage (persistent file-based)
 SESSION_FILE = os.path.join(DOWNLOAD_DIR, ".sessions.json")
