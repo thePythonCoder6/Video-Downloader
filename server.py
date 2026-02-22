@@ -269,49 +269,69 @@ async def download_video(url: str = Form(...), cookies: str = Form(""), format: 
     except Exception as e:
         error_msg = str(e)
         
-        # If bot detection and it's a YouTube URL, try Invidious
+        # If bot detection and it's a YouTube URL, try multiple Invidious instances
         if ("Sign in to confirm" in error_msg or "bot" in error_msg.lower()) and "youtube.com" in url:
             # Extract video ID
             video_id_match = re.search(r'(?:v=|/)([a-zA-Z0-9_-]{11})', url)
             if video_id_match:
                 video_id = video_id_match.group(1)
-                invidious_url = f"https://invidious.jing.rocks/watch?v={video_id}"
                 
-                try:
-                    opts_inv = {
-                        "outtmpl": template,
-                        "format": "best",
-                        "noplaylist": True,
-                        "quiet": True,
-                    }
-                    
-                    with yt_dlp.YoutubeDL(opts_inv) as ydl:
-                        info = ydl.extract_info(invidious_url, download=True)
-                        ext = info.get("ext", "mp4")
+                # List of Invidious instances to try
+                invidious_instances = [
+                    "https://inv.nadeko.net",
+                    "https://invidious.privacyredirect.com",
+                    "https://yewtu.be",
+                    "https://invidious.fdn.fr",
+                    "https://inv.riverside.rocks",
+                ]
+                
+                last_inv_error = None
+                for instance in invidious_instances:
+                    try:
+                        invidious_url = f"{instance}/watch?v={video_id}"
+                        print(f"🔄 Trying Invidious instance: {instance}")
+                        
+                        opts_inv = {
+                            "outtmpl": template,
+                            "format": "best",
+                            "noplaylist": True,
+                            "quiet": True,
+                            "socket_timeout": 30,
+                        }
+                        
+                        with yt_dlp.YoutubeDL(opts_inv) as ydl:
+                            info = ydl.extract_info(invidious_url, download=True)
+                            ext = info.get("ext", "mp4")
 
-                    filename = f"{file_id}.{ext}"
-                    
-                    # Add to history
-                    history = load_history()
-                    history_item = {
-                        "id": file_id,
-                        "url": url,
-                        "file": f"/api/file/{filename}",
-                        "filename": filename,
-                        "timestamp": datetime.now().isoformat(),
-                        "title": extract_title_from_info(info)
-                    }
-                    history.insert(0, history_item)
-                    
-                    if len(history) > 50:
-                        history = history[:50]
-                    
-                    save_history_data(history)
-                    
-                    return JSONResponse({"file": f"/api/file/{filename}", "id": file_id})
-                    
-                except Exception as inv_error:
-                    return JSONResponse({"error": f"YouTube blocked and Invidious failed: {str(inv_error)}. Try providing cookies."}, status_code=500)
+                        filename = f"{file_id}.{ext}"
+                        
+                        # Add to history
+                        history = load_history()
+                        history_item = {
+                            "id": file_id,
+                            "url": url,
+                            "file": f"/api/file/{filename}",
+                            "filename": filename,
+                            "timestamp": datetime.now().isoformat(),
+                            "title": extract_title_from_info(info)
+                        }
+                        history.insert(0, history_item)
+                        
+                        if len(history) > 50:
+                            history = history[:50]
+                        
+                        save_history_data(history)
+                        
+                        print(f"✅ Successfully downloaded via {instance}")
+                        return JSONResponse({"file": f"/api/file/{filename}", "id": file_id})
+                        
+                    except Exception as inv_error:
+                        last_inv_error = str(inv_error)
+                        print(f"❌ {instance} failed: {inv_error}")
+                        continue  # Try next instance
+                
+                # All instances failed
+                return JSONResponse({"error": f"YouTube blocked and all Invidious instances failed. Last error: {last_inv_error}. Try providing cookies."}, status_code=500)
         
         return JSONResponse({"error": f"{error_msg}. For YouTube, try providing cookies."}, status_code=500)
     
