@@ -7,26 +7,56 @@ import os
 import re
 import hashlib
 import secrets
+import bcrypt
+import json
+from pathlib import Path
 
 app = FastAPI()
 
 DOWNLOAD_DIR = "downloads"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
-# Login credentials
-USERNAME = "thepythoncoder6"  # Case insensitive
-PASSWORD = "Qwertyuiop!"
+# Login credentials from environment variables (with fallback for first run)
+USERNAME = os.getenv("LOGIN_USERNAME", "thepythoncoder6").lower()  # Case insensitive
+PASSWORD_HASH = os.getenv("LOGIN_PASSWORD_HASH", None)
 
-# Session storage (in-memory)
-active_sessions = set()
+# If no hash in env, hash the default password on first run
+if not PASSWORD_HASH:
+    default_password = os.getenv("LOGIN_PASSWORD", "Qwertyuiop!")
+    PASSWORD_HASH = bcrypt.hashpw(default_password.encode(), bcrypt.gensalt()).decode()
+    print(f"⚠️  Using default credentials. Set LOGIN_USERNAME and LOGIN_PASSWORD_HASH env vars for production.")
+    print(f"⚠️  Generated hash for current password: {PASSWORD_HASH}")
+
+# Session storage (persistent file-based)
+SESSION_FILE = os.path.join(DOWNLOAD_DIR, ".sessions.json")
+
+def load_sessions():
+    if os.path.exists(SESSION_FILE):
+        try:
+            with open(SESSION_FILE, "r") as f:
+                return set(json.load(f))
+        except:
+            return set()
+    return set()
+
+def save_sessions():
+    try:
+        with open(SESSION_FILE, "w") as f:
+            json.dump(list(active_sessions), f)
+    except:
+        pass
+
+active_sessions = load_sessions()
 
 
 @app.post("/api/login")
 async def login(username: str = Form(...), password: str = Form(...)):
-    if username.lower() == USERNAME and password == PASSWORD:
+    # Check username and password hash
+    if username.lower() == USERNAME and bcrypt.checkpw(password.encode(), PASSWORD_HASH.encode()):
         # Generate session token
         session_token = secrets.token_urlsafe(32)
         active_sessions.add(session_token)
+        save_sessions()
         
         response = JSONResponse({"success": True})
         response.set_cookie(
@@ -45,6 +75,7 @@ async def login(username: str = Form(...), password: str = Form(...)):
 async def logout(session: str = Cookie(None)):
     if session in active_sessions:
         active_sessions.remove(session)
+        save_sessions()
     
     response = JSONResponse({"success": True})
     response.delete_cookie("session")
