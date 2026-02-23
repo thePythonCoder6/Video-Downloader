@@ -87,14 +87,13 @@ h2 {
         <input 
             type="text" 
             id="username" 
-            placeholder="Username or leave blank for PIN" 
-            autocomplete="username"
+            placeholder="Username" 
             autocomplete="off"
         >
         <input 
             type="password" 
             id="password" 
-            placeholder="Password or 4-digit PIN" 
+            placeholder="Password" 
             required
             autocomplete="current-password"
         >
@@ -147,12 +146,7 @@ async function handleLogin(event) {
         if (data.success) {
             window.location.href = "/";
         } else {
-            let errorMsg = data.error || "Invalid credentials";
-            // If PIN was wrong, suggest using username/password
-            if (errorMsg === "Invalid PIN") {
-                errorMsg = "Invalid PIN. Please fill out username/password instead.";
-            }
-            errorEl.textContent = errorMsg;
+            errorEl.textContent = "Invalid credentials";
             loginBtn.disabled = false;
             loginBtn.textContent = "Login";
         }
