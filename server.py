@@ -9,6 +9,8 @@ import hashlib
 import secrets
 import bcrypt
 import json
+import random
+import requests
 from pathlib import Path
 from datetime import datetime
 
@@ -89,6 +91,42 @@ def save_history_data(history):
             json.dump(history, f, indent=2)
     except:
         pass
+
+def get_free_proxies():
+    """Fetch and return a list of free proxies"""
+    proxies = []
+    
+    try:
+        # ProxyScrape API
+        response = requests.get(
+            "https://api.proxyscrape.com/v2/?request=get&protocol=http&timeout=10000&country=all&ssl=all&anonymity=all",
+            timeout=10
+        )
+        if response.status_code == 200:
+            proxy_list = response.text.strip().split('\n')
+            proxies.extend([f"http://{p.strip()}" for p in proxy_list if p.strip()])
+    except:
+        pass
+    
+    # Fallback static list of commonly working free proxies
+    fallback_proxies = [
+        "http://8.213.128.6:8080",
+        "http://20.206.106.192:8123",
+        "http://20.204.212.76:8123",
+        "http://51.79.50.22:9300",
+        "http://51.79.50.46:9300",
+        "http://162.223.94.163:80",
+        "http://47.251.43.115:33333",
+        "http://103.152.112.162:80",
+    ]
+    
+    if not proxies:
+        proxies = fallback_proxies
+    
+    # Shuffle for random selection
+    random.shuffle(proxies)
+    return proxies[:20]  # Return max 20 proxies
+
 
 def extract_title_from_info(info):
     """Extract video title from yt-dlp info"""
@@ -383,8 +421,62 @@ async def download_video(url: str = Form(...), cookies: str = Form(""), format: 
                         print(f"❌ {instance} failed: {inv_error}")
                         continue  # Try next instance
                 
+                # Strategy 3: Try free proxies
+                print("🔄 Attempting download with free proxies...")
+                proxies = get_free_proxies()
+                last_proxy_error = None
+                
+                for proxy in proxies:
+                    try:
+                        print(f"🔄 Trying proxy: {proxy}")
+                        
+                        opts_proxy = {
+                            "outtmpl": template,
+                            "format": "best",
+                            "noplaylist": True,
+                            "quiet": True,
+                            "socket_timeout": 15,
+                            "proxy": proxy,
+                            "extractor_args": {
+                                "youtube": {
+                                    "player_client": ["android_creator", "mediaconnect"],
+                                }
+                            },
+                        }
+                        
+                        with yt_dlp.YoutubeDL(opts_proxy) as ydl:
+                            info = ydl.extract_info(url, download=True)
+                            ext = info.get("ext", "mp4")
+
+                        filename = f"{file_id}.{ext}"
+                        
+                        # Add to history
+                        history = load_history()
+                        history_item = {
+                            "id": file_id,
+                            "url": url,
+                            "file": f"/api/file/{filename}",
+                            "filename": filename,
+                            "timestamp": datetime.now().isoformat(),
+                            "title": extract_title_from_info(info)
+                        }
+                        history.insert(0, history_item)
+                        
+                        if len(history) > 50:
+                            history = history[:50]
+                        
+                        save_history_data(history)
+                        
+                        print(f"✅ Successfully downloaded via proxy: {proxy}")
+                        return JSONResponse({"file": f"/api/file/{filename}", "id": file_id})
+                        
+                    except Exception as proxy_error:
+                        last_proxy_error = str(proxy_error)
+                        print(f"❌ Proxy {proxy} failed: {proxy_error}")
+                        continue
+                
                 # All strategies failed
-                return JSONResponse({"error": f"YouTube blocked. Tried youtube-nocookie and all Invidious instances. Last error: {last_inv_error}. Try providing cookies."}, status_code=500)
+                return JSONResponse({"error": f"YouTube blocked. Tried youtube-nocookie, {len(invidious_instances)} Invidious instances, and {len(proxies)} free proxies. Last error: {last_proxy_error or last_inv_error}. Recommendation: Use cookies for 100% success."}, status_code=500)
         
         return JSONResponse({"error": f"{error_msg}. For YouTube, try providing cookies."}, status_code=500)
     
