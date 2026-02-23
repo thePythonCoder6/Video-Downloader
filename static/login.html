@@ -89,6 +89,7 @@ h2 {
             id="username" 
             placeholder="Username or leave blank for PIN" 
             autocomplete="username"
+            autocomplete="off"
         >
         <input 
             type="password" 
@@ -107,18 +108,28 @@ h2 {
 async function handleLogin(event) {
     event.preventDefault();
     
-    const username = document.getElementById("username").value;
+    const usernameInput = document.getElementById("username");
+    const username = usernameInput.value;
     const password = document.getElementById("password").value;
     const errorEl = document.getElementById("error");
     const loginBtn = document.getElementById("loginBtn");
     
     errorEl.textContent = "";
+    
+    // If password is 4 digits and username is empty, it's a PIN login
+    const isPinLogin = password.length === 4 && /^\d{4}$/.test(password) && !username.trim();
+    
+    // Validate: if not PIN login, username is required
+    if (!isPinLogin && !username.trim()) {
+        errorEl.textContent = "Please enter username or use 4-digit PIN";
+        return;
+    }
+    
     loginBtn.disabled = true;
     loginBtn.textContent = "Logging in...";
     
     const form = new FormData();
-    // If password is 4 digits and username is empty, it's a PIN login
-    if (password.length === 4 && /^\d{4}$/.test(password) && !username.trim()) {
+    if (isPinLogin) {
         form.append("username", "pin_user");  // Dummy username for PIN login
     } else {
         form.append("username", username);
@@ -136,7 +147,11 @@ async function handleLogin(event) {
         if (data.success) {
             window.location.href = "/";
         } else {
-            const errorMsg = data.error || "Invalid credentials";
+            let errorMsg = data.error || "Invalid credentials";
+            // If PIN was wrong, suggest using username/password
+            if (errorMsg === "Invalid PIN") {
+                errorMsg = "Invalid PIN. Please fill out username/password instead.";
+            }
             errorEl.textContent = errorMsg;
             loginBtn.disabled = false;
             loginBtn.textContent = "Login";
