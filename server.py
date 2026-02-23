@@ -92,6 +92,41 @@ def save_history_data(history):
     except:
         pass
 
+def get_webshare_proxies():
+    """Fetch proxies from Webshare API if API key is set"""
+    api_key = os.getenv("WEBSHARE_API_KEY")
+    if not api_key:
+        return []
+    
+    try:
+        print("🔑 Fetching Webshare proxies...")
+        response = requests.get(
+            "https://proxy.webshare.io/api/v2/proxy/list/?mode=direct&page=1&page_size=25",
+            headers={"Authorization": f"Token {api_key}"},
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            proxies = []
+            for proxy in data.get("results", []):
+                username = proxy.get("username")
+                password = proxy.get("password")
+                host = proxy.get("proxy_address")
+                port = proxy.get("port")
+                
+                if username and password and host and port:
+                    proxy_url = f"http://{username}:{password}@{host}:{port}"
+                    proxies.append(proxy_url)
+            
+            print(f"✅ Fetched {len(proxies)} Webshare proxies")
+            return proxies
+    except Exception as e:
+        print(f"❌ Webshare API error: {e}")
+    
+    return []
+
+
 def get_free_proxies():
     """Fetch and return a list of free proxies"""
     proxies = []
@@ -421,7 +456,62 @@ async def download_video(url: str = Form(...), cookies: str = Form(""), format: 
                         print(f"❌ {instance} failed: {inv_error}")
                         continue  # Try next instance
                 
-                # Strategy 3: Try free proxies
+                # Strategy 3: Try Webshare proxies (if API key set)
+                webshare_proxies = get_webshare_proxies()
+                last_webshare_error = None
+                
+                if webshare_proxies:
+                    print(f"🔄 Attempting download with {len(webshare_proxies)} Webshare proxies...")
+                    for proxy in webshare_proxies:
+                        try:
+                            print(f"🔄 Trying Webshare proxy: {proxy.split('@')[1] if '@' in proxy else proxy}")
+                            
+                            opts_proxy = {
+                                "outtmpl": template,
+                                "format": "best",
+                                "noplaylist": True,
+                                "quiet": True,
+                                "socket_timeout": 20,
+                                "proxy": proxy,
+                                "extractor_args": {
+                                    "youtube": {
+                                        "player_client": ["android_creator", "mediaconnect"],
+                                    }
+                                },
+                            }
+                            
+                            with yt_dlp.YoutubeDL(opts_proxy) as ydl:
+                                info = ydl.extract_info(url, download=True)
+                                ext = info.get("ext", "mp4")
+
+                            filename = f"{file_id}.{ext}"
+                            
+                            # Add to history
+                            history = load_history()
+                            history_item = {
+                                "id": file_id,
+                                "url": url,
+                                "file": f"/api/file/{filename}",
+                                "filename": filename,
+                                "timestamp": datetime.now().isoformat(),
+                                "title": extract_title_from_info(info)
+                            }
+                            history.insert(0, history_item)
+                            
+                            if len(history) > 50:
+                                history = history[:50]
+                            
+                            save_history_data(history)
+                            
+                            print(f"✅ Successfully downloaded via Webshare proxy")
+                            return JSONResponse({"file": f"/api/file/{filename}", "id": file_id})
+                            
+                        except Exception as proxy_error:
+                            last_webshare_error = str(proxy_error)
+                            print(f"❌ Webshare proxy failed: {proxy_error}")
+                            continue
+                
+                # Strategy 4: Try free proxies
                 print("🔄 Attempting download with free proxies...")
                 proxies = get_free_proxies()
                 last_proxy_error = None
@@ -476,7 +566,8 @@ async def download_video(url: str = Form(...), cookies: str = Form(""), format: 
                         continue
                 
                 # All strategies failed
-                return JSONResponse({"error": f"YouTube blocked. Tried youtube-nocookie, {len(invidious_instances)} Invidious instances, and {len(proxies)} free proxies. Last error: {last_proxy_error or last_inv_error}. Recommendation: Use cookies for 100% success."}, status_code=500)
+                webshare_msg = f", {len(webshare_proxies)} Webshare proxies" if webshare_proxies else ""
+                return JSONResponse({"error": f"YouTube blocked. Tried youtube-nocookie, {len(invidious_instances)} Invidious instances{webshare_msg}, and {len(proxies)} free proxies. Last error: {last_proxy_error or last_webshare_error or last_inv_error}. Recommendation: Use cookies for 100% success."}, status_code=500)
         
         return JSONResponse({"error": f"{error_msg}. For YouTube, try providing cookies."}, status_code=500)
     
