@@ -49,6 +49,16 @@ def load_credentials():
 
 USERNAME, DEFAULT_PASSWORD = load_credentials()
 PASSWORD_HASH = bcrypt.hashpw(DEFAULT_PASSWORD.encode(), bcrypt.gensalt()).decode()
+
+# Load 4-digit PIN from environment variable
+PIN_CODE = os.getenv("LOGIN_PIN")  # Optional 4-digit PIN
+if PIN_CODE:
+    if len(PIN_CODE) == 4 and PIN_CODE.isdigit():
+        print(f"✅ 4-digit PIN enabled")
+    else:
+        print(f"⚠️ LOGIN_PIN must be exactly 4 digits. PIN disabled.")
+        PIN_CODE = None
+
 print(f"✅ Final username (lowercase): {USERNAME}")
 print(f"✅ Password length: {len(DEFAULT_PASSWORD)} chars")
 
@@ -186,6 +196,26 @@ def extract_title_from_info(info):
 
 @app.post("/api/login")
 async def login(username: str = Form(...), password: str = Form(...)):
+    # Check if 4-digit PIN is provided and matches
+    if PIN_CODE and len(password) == 4 and password.isdigit():
+        if password == PIN_CODE:
+            # Generate session token
+            session_token = secrets.token_urlsafe(32)
+            active_sessions.add(session_token)
+            save_sessions()
+            
+            response = JSONResponse({"success": True})
+            response.set_cookie(
+                key="session",
+                value=session_token,
+                httponly=True,
+                max_age=86400,  # 24 hours
+                samesite="lax"
+            )
+            return response
+        else:
+            return JSONResponse({"error": "Invalid PIN"}, status_code=401)
+    
     # Check username and password hash
     if username.lower() == USERNAME and bcrypt.checkpw(password.encode(), PASSWORD_HASH.encode()):
         # Generate session token

@@ -87,14 +87,13 @@ h2 {
         <input 
             type="text" 
             id="username" 
-            placeholder="Username" 
-            required
+            placeholder="Username or leave blank for PIN" 
             autocomplete="username"
         >
         <input 
             type="password" 
             id="password" 
-            placeholder="Password" 
+            placeholder="Password or 4-digit PIN" 
             required
             autocomplete="current-password"
         >
@@ -118,7 +117,12 @@ async function handleLogin(event) {
     loginBtn.textContent = "Logging in...";
     
     const form = new FormData();
-    form.append("username", username);
+    // If password is 4 digits and username is empty, it's a PIN login
+    if (password.length === 4 && /^\d{4}$/.test(password) && !username.trim()) {
+        form.append("username", "pin_user");  // Dummy username for PIN login
+    } else {
+        form.append("username", username);
+    }
     form.append("password", password);
     
     try {
@@ -132,7 +136,8 @@ async function handleLogin(event) {
         if (data.success) {
             window.location.href = "/";
         } else {
-            errorEl.textContent = data.error || "Invalid credentials";
+            const errorMsg = data.error || "Invalid credentials";
+            errorEl.textContent = errorMsg;
             loginBtn.disabled = false;
             loginBtn.textContent = "Login";
         }
