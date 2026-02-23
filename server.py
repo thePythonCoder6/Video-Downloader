@@ -372,121 +372,14 @@ async def download_video(url: str = Form(...), cookies: str = Form(""), format: 
     except Exception as e:
         error_msg = str(e)
         
-        # If bot detection and it's a YouTube URL, try multiple Invidious instances
+        # If bot detection and it's a YouTube URL, try Webshare proxies only
         if ("Sign in to confirm" in error_msg or "bot" in error_msg.lower()) and "youtube.com" in url:
             # Extract video ID
             video_id_match = re.search(r'(?:v=|/)([a-zA-Z0-9_-]{11})', url)
             if video_id_match:
                 video_id = video_id_match.group(1)
                 
-                # List of Invidious instances to try
-                invidious_instances = [
-                    "https://inv.nadeko.net",
-                    "https://invidious.privacyredirect.com",
-                    "https://yewtu.be",
-                    "https://invidious.fdn.fr",
-                    "https://inv.riverside.rocks",
-                    "https://iv.ggtyler.dev",
-                    "https://invidious.nerdvpn.de",
-                    "https://inv.tux.pizza",
-                    "https://invidious.private.coffee",
-                    "https://yt.artemislena.eu",
-                ]
-                
-                # Strategy 1: Try youtube-nocookie domain
-                try:
-                    nocookie_url = url.replace("youtube.com", "youtube-nocookie.com")
-                    print(f"🔄 Trying youtube-nocookie: {nocookie_url}")
-                    
-                    opts_nocookie = {
-                        "outtmpl": template,
-                        "format": "best",
-                        "noplaylist": True,
-                        "quiet": True,
-                        "socket_timeout": 30,
-                                    "extractor_args": {
-                "youtube": {
-                    "player_client": ["android_creator", "mediaconnect", "tv_embedded"],
-                }
-            },
-                    }
-                    
-                    with yt_dlp.YoutubeDL(opts_nocookie) as ydl:
-                        info = ydl.extract_info(nocookie_url, download=True)
-                        ext = info.get("ext", "mp4")
-
-                    filename = f"{file_id}.{ext}"
-                    
-                    # Add to history
-                    history = load_history()
-                    history_item = {
-                        "id": file_id,
-                        "url": url,
-                        "file": f"/api/file/{filename}",
-                        "filename": filename,
-                        "timestamp": datetime.now().isoformat(),
-                        "title": extract_title_from_info(info)
-                    }
-                    history.insert(0, history_item)
-                    
-                    if len(history) > 50:
-                        history = history[:50]
-                    
-                    save_history_data(history)
-                    
-                    print(f"✅ Successfully downloaded via youtube-nocookie")
-                    return JSONResponse({"file": f"/api/file/{filename}", "id": file_id})
-                    
-                except Exception as nocookie_error:
-                    print(f"❌ youtube-nocookie failed: {nocookie_error}")
-                
-                # Strategy 2: Try Invidious instances
-                last_inv_error = None
-                for instance in invidious_instances:
-                    try:
-                        invidious_url = f"{instance}/watch?v={video_id}"
-                        print(f"🔄 Trying Invidious instance: {instance}")
-                        
-                        opts_inv = {
-                            "outtmpl": template,
-                            "format": "best",
-                            "noplaylist": True,
-                            "quiet": True,
-                            "socket_timeout": 30,
-                        }
-                        
-                        with yt_dlp.YoutubeDL(opts_inv) as ydl:
-                            info = ydl.extract_info(invidious_url, download=True)
-                            ext = info.get("ext", "mp4")
-
-                        filename = f"{file_id}.{ext}"
-                        
-                        # Add to history
-                        history = load_history()
-                        history_item = {
-                            "id": file_id,
-                            "url": url,
-                            "file": f"/api/file/{filename}",
-                            "filename": filename,
-                            "timestamp": datetime.now().isoformat(),
-                            "title": extract_title_from_info(info)
-                        }
-                        history.insert(0, history_item)
-                        
-                        if len(history) > 50:
-                            history = history[:50]
-                        
-                        save_history_data(history)
-                        
-                        print(f"✅ Successfully downloaded via {instance}")
-                        return JSONResponse({"file": f"/api/file/{filename}", "id": file_id})
-                        
-                    except Exception as inv_error:
-                        last_inv_error = str(inv_error)
-                        print(f"❌ {instance} failed: {inv_error}")
-                        continue  # Try next instance
-                
-                # Strategy 3: Try Webshare proxies (if API key set)
+                # Try Webshare proxies (if API key set)
                 webshare_proxies = get_webshare_proxies()
                 last_webshare_error = None
                 
@@ -541,63 +434,11 @@ async def download_video(url: str = Form(...), cookies: str = Form(""), format: 
                             print(f"❌ Webshare proxy failed: {proxy_error}")
                             continue
                 
-                # Strategy 4: Try free proxies
-                print("🔄 Attempting download with free proxies...")
-                proxies = get_free_proxies()
-                last_proxy_error = None
-                
-                for proxy in proxies:
-                    try:
-                        print(f"🔄 Trying proxy: {proxy}")
-                        
-                        opts_proxy = {
-                            "outtmpl": template,
-                            "format": "best",
-                            "noplaylist": True,
-                            "quiet": True,
-                            "socket_timeout": 15,
-                            "proxy": proxy,
-                            "extractor_args": {
-                                "youtube": {
-                                    "player_client": ["android_creator", "mediaconnect"],
-                                }
-                            },
-                        }
-                        
-                        with yt_dlp.YoutubeDL(opts_proxy) as ydl:
-                            info = ydl.extract_info(url, download=True)
-                            ext = info.get("ext", "mp4")
-
-                        filename = f"{file_id}.{ext}"
-                        
-                        # Add to history
-                        history = load_history()
-                        history_item = {
-                            "id": file_id,
-                            "url": url,
-                            "file": f"/api/file/{filename}",
-                            "filename": filename,
-                            "timestamp": datetime.now().isoformat(),
-                            "title": extract_title_from_info(info)
-                        }
-                        history.insert(0, history_item)
-                        
-                        if len(history) > 50:
-                            history = history[:50]
-                        
-                        save_history_data(history)
-                        
-                        print(f"✅ Successfully downloaded via proxy: {proxy}")
-                        return JSONResponse({"file": f"/api/file/{filename}", "id": file_id})
-                        
-                    except Exception as proxy_error:
-                        last_proxy_error = str(proxy_error)
-                        print(f"❌ Proxy {proxy} failed: {proxy_error}")
-                        continue
-                
                 # All strategies failed
-                webshare_msg = f", {len(webshare_proxies)} Webshare proxies" if webshare_proxies else ""
-                return JSONResponse({"error": f"YouTube blocked. Tried youtube-nocookie, {len(invidious_instances)} Invidious instances{webshare_msg}, and {len(proxies)} free proxies. Last error: {last_proxy_error or last_webshare_error or last_inv_error}. Recommendation: Use cookies for 100% success."}, status_code=500)
+                if webshare_proxies:
+                    return JSONResponse({"error": f"YouTube blocked. Tried {len(webshare_proxies)} Webshare proxies. Last error: {last_webshare_error}. Recommendation: Use cookies for 100% success."}, status_code=500)
+                else:
+                    return JSONResponse({"error": f"YouTube blocked. No Webshare API key configured. Recommendation: Add WEBSHARE_API_KEY or use cookies for 100% success."}, status_code=500)
         
         return JSONResponse({"error": f"{error_msg}. For YouTube, try providing cookies."}, status_code=500)
     
