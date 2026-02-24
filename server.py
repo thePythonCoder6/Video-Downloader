@@ -254,127 +254,76 @@ def check_auth(session: str = Cookie(None)):
 
 
 async def download_spotify(url: str, format: str, session: str):
-    """Download Spotify tracks/playlists/albums using spotdl"""
+    """Download Spotify tracks using yt-dlp via YouTube search"""
     file_id = str(uuid.uuid4())
-    output_dir = os.path.join(DOWNLOAD_DIR, file_id)
-    os.makedirs(output_dir, exist_ok=True)
     
     try:
-        print(f"🎵 Downloading from Spotify: {url}")
+        print(f"🎵 Downloading from Spotify via YouTube: {url}")
         
         # Determine output format
         audio_formats = ['mp3', 'm4a', 'wav', 'flac', 'aac', 'opus', 'vorbis']
         output_format = format if format in audio_formats else 'mp3'
         
-        # Run spotdl
-        cmd = [
-            "spotdl",
-            "download",
-            url,
-            "--output", output_dir,
-            "--format", output_format,
-            "--bitrate", "320k" if output_format == 'mp3' else "auto"
-        ]
+        # Use yt-dlp with Spotify URL (it searches YouTube automatically)
+        template = os.path.join(DOWNLOAD_DIR, f"{file_id}.%(ext)s")
+        quality = "0" if output_format in ['wav', 'flac'] else "320"
         
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=300  # 5 minute timeout
-        )
+        opts = {
+            "outtmpl": template,
+            "format": "bestaudio/best",
+            "noplaylist": True,
+            "quiet": True,
+            "no_warnings": True,
+            "postprocessors": [{
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": output_format if output_format != 'vorbis' else 'vorbis',
+                "preferredquality": quality,
+            }],
+            "default_search": "ytsearch",
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["android_creator", "mediaconnect", "tv_embedded"],
+                }
+            },
+        }
         
-        if result.returncode != 0:
-            print(f"❌ spotdl error: {result.stderr}")
-            return JSONResponse({"error": f"Spotify download failed: {result.stderr}"}, status_code=500)
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            ext = info.get("ext", output_format)
         
-        # Find downloaded files
-        downloaded_files = glob.glob(os.path.join(output_dir, f"*.{output_format}"))
+        filename = f"{file_id}.{ext}"
         
-        if not downloaded_files:
-            return JSONResponse({"error": "No files downloaded from Spotify"}, status_code=500)
+        if not os.path.exists(os.path.join(DOWNLOAD_DIR, filename)):
+            print(f"❌ File not found after download")
+            return JSONResponse({"error": "Spotify download failed: File not created"}, status_code=500)
         
-        # If single track, move to main directory
-        if len(downloaded_files) == 1:
-            src_file = downloaded_files[0]
-            filename = f"{file_id}.{output_format}"
-            dest_file = os.path.join(DOWNLOAD_DIR, filename)
-            os.rename(src_file, dest_file)
-            os.rmdir(output_dir)
-            
-            # Extract title from filename
-            title = os.path.splitext(os.path.basename(src_file))[0][:100]
-            
-            # Add to history
-            history = load_history()
-            history_item = {
-                "id": file_id,
-                "url": url,
-                "file": f"/api/file/{filename}",
-                "filename": filename,
-                "timestamp": datetime.now().isoformat(),
-                "title": f"🎵 {title}"
-            }
-            history.insert(0, history_item)
-            
-            if len(history) > 50:
-                history = history[:50]
-            
-            save_history_data(history)
-            
-            print(f"✅ Spotify download complete: {title}")
-            return JSONResponse({"file": f"/api/file/{filename}", "id": file_id})
+        # Extract title from info
+        title = info.get('title', 'Spotify Track')[:100]
         
-        # Multiple tracks (playlist/album) - create zip
-        else:
-            import zipfile
-            
-            zip_filename = f"{file_id}.zip"
-            zip_path = os.path.join(DOWNLOAD_DIR, zip_filename)
-            
-            with zipfile.ZipFile(zip_path, 'w') as zipf:
-                for file_path in downloaded_files:
-                    zipf.write(file_path, os.path.basename(file_path))
-            
-            # Clean up individual files
-            for file_path in downloaded_files:
-                os.remove(file_path)
-            os.rmdir(output_dir)
-            
-            # Add to history
-            history = load_history()
-            history_item = {
-                "id": file_id,
-                "url": url,
-                "file": f"/api/file/{zip_filename}",
-                "filename": zip_filename,
-                "timestamp": datetime.now().isoformat(),
-                "title": f"🎵 Spotify Playlist ({len(downloaded_files)} tracks)"
-            }
-            history.insert(0, history_item)
-            
-            if len(history) > 50:
-                history = history[:50]
-            
-            save_history_data(history)
-            
-            print(f"✅ Spotify playlist download complete: {len(downloaded_files)} tracks")
-            return JSONResponse({"file": f"/api/file/{zip_filename}", "id": file_id})
-    
-    except subprocess.TimeoutExpired:
-        return JSONResponse({"error": "Spotify download timeout (5 minutes)"}, status_code=500)
+        # Add to history
+        history = load_history()
+        history_item = {
+            "id": file_id,
+            "url": url,
+            "file": f"/api/file/{filename}",
+            "filename": filename,
+            "timestamp": datetime.now().isoformat(),
+            "title": f"🎵 {title}"
+        }
+        history.insert(0, history_item)
+        
+        if len(history) > 50:
+            history = history[:50]
+        
+        save_history_data(history)
+        
+        print(f"✅ Spotify download complete: {title}")
+        return JSONResponse({"file": f"/api/file/{filename}", "id": file_id})
     except Exception as e:
         print(f"❌ Spotify download error: {e}")
         import traceback
         traceback.print_exc()
         return JSONResponse({"error": f"Spotify download failed: {str(e)}"}, status_code=500)
-    finally:
-        # Cleanup output dir if it still exists
-        if os.path.exists(output_dir):
-            try:
-                import shutil
-                shutil.rmtree(output_dir)
-            except:
-                pass
 
 
 @app.post("/api/download")

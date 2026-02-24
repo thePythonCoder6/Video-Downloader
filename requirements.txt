@@ -4,5 +4,3 @@ yt-dlp
 python-multipart
 bcrypt
 requests
-setuptools
-spotdl
