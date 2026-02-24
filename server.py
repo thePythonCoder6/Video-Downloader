@@ -254,130 +254,66 @@ def check_auth(session: str = Cookie(None)):
 
 
 async def download_spotify(url: str, format: str, session: str):
-    """Download Spotify tracks by extracting metadata and searching YouTube"""
+    """Download Spotify tracks using Potty (HARMONI)"""
     file_id = str(uuid.uuid4())
     
     try:
-        print(f"🎵 Processing Spotify URL: {url}")
-        
-        # Extract track ID from Spotify URL
-        track_id_match = re.search(r'track/([a-zA-Z0-9]+)', url)
-        if not track_id_match:
-            return JSONResponse({"error": "Invalid Spotify track URL"}, status_code=400)
-        
-        track_id = track_id_match.group(1)
-        
-        # Use Spotify Web API (no auth needed for track metadata)
-        try:
-            import spotipy
-            from spotipy.oauth2 import SpotifyClientCredentials
-            
-            # Try without credentials first (public API)
-            sp = spotipy.Spotify()
-            track = sp.track(track_id)
-            
-            # Extract metadata
-            track_name = track['name']
-            artists = ', '.join([artist['name'] for artist in track['artists']])
-            search_query = f"{artists} - {track_name} official audio"
-            
-            print(f"🔍 Searching YouTube for: {search_query}")
-            
-        except Exception as spotify_error:
-            print(f"⚠️ Spotify API failed, using URL as search: {spotify_error}")
-            # Fallback: just use the URL as search term
-            search_query = f"ytsearch:{url}"
+        print(f"🎵 Processing Spotify URL with Potty: {url}")
         
         # Determine output format
         audio_formats = ['mp3', 'm4a', 'wav', 'flac', 'aac', 'opus', 'vorbis']
         output_format = format if format in audio_formats else 'mp3'
         
-        # Download from YouTube
-        template = os.path.join(DOWNLOAD_DIR, f"{file_id}.%(ext)s")
-        quality = "0" if output_format in ['wav', 'flac'] else "320"
+        # Use Potty to download from Spotify
+        from potty import Downloader
         
-        opts = {
-            "outtmpl": template,
-            "format": "bestaudio/best",
-            "noplaylist": True,
-            "quiet": False,  # Show output for debugging
-            "no_warnings": False,
-            "postprocessors": [{
-                "key": "FFmpegExtractAudio",
-                "preferredcodec": output_format if output_format != 'vorbis' else 'vorbis',
-                "preferredquality": quality,
-            }],
-            # Removed default_search - using explicit search in URL
-            "extractor_args": {
-                "youtube": {
-                    "player_client": ["android_creator", "mediaconnect", "tv_embedded"],
-                }
-            },
-        }
+        downloader = Downloader()
         
-        # Instead of using default_search, construct a direct YouTube search URL
-        yt_search_url = f"ytsearch1:{search_query}"
+        # Set output directory
+        output_path = os.path.join(DOWNLOAD_DIR, file_id)
+        os.makedirs(output_path, exist_ok=True)
         
-        print(f"🔍 Using search URL: {yt_search_url}")
-        print(f"🔍 Output template: {template}")
-        print(f"🔍 Options: {opts}")
+        print(f"🔍 Downloading with Potty to: {output_path}")
         
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            print(f"🔍 Calling extract_info...")
-            info = ydl.extract_info(yt_search_url, download=True)
-            print(f"✅ extract_info returned")
-            
-            if info:
-                print(f"✅ Info type: {type(info)}")
-                print(f"✅ Info keys: {info.keys() if isinstance(info, dict) else 'not a dict'}")
-                if 'entries' in info:
-                    print(f"✅ Has entries: {len(info['entries'])}")
-                    if info['entries']:
-                        actual_info = info['entries'][0]
-                        print(f"✅ First entry keys: {actual_info.keys()}")
-                        print(f"✅ Video ID: {actual_info.get('id')}")
-                        print(f"✅ Title: {actual_info.get('title')}")
-            else:
-                print(f"❌ Info is None!")
+        # Download the track
+        result = downloader.download(
+            url,
+            output=output_path,
+            format=output_format
+        )
         
-        # Give FFmpeg a moment to finish post-processing
-        import time
-        time.sleep(2)
+        print(f"✅ Potty download complete: {result}")
         
-        # Find the actual downloaded file (post-processing changes extension)
-        print(f"🔍 Looking for files matching: {file_id}.*")
-        all_files = os.listdir(DOWNLOAD_DIR)
-        print(f"📁 All files in directory ({len(all_files)} total): {all_files}")
-        print(f"📁 Non-hidden files: {[f for f in all_files if not f.startswith('.')]}")
-        
-        downloaded_files = glob.glob(os.path.join(DOWNLOAD_DIR, f"{file_id}.*"))
-        print(f"📁 Matched files: {downloaded_files}")
+        # Find downloaded files
+        downloaded_files = glob.glob(os.path.join(output_path, f"*.{output_format}"))
         
         if not downloaded_files:
-            print(f"❌ No files found for {file_id}")
-            # Try alternative pattern - maybe the file has a different naming
-            alternative_files = [f for f in all_files if file_id in f and not f.endswith('.part')]
-            print(f"🔍 Alternative matches: {alternative_files}")
-            
-            if alternative_files:
-                downloaded_file = os.path.join(DOWNLOAD_DIR, alternative_files[0])
-                filename = alternative_files[0]
-                print(f"✅ Found via alternative search: {filename}")
-            else:
-                return JSONResponse({"error": f"Spotify download failed: File not created. Searched for {file_id}.* in {len(all_files)} files"}, status_code=500)
+            # Try any audio file
+            downloaded_files = glob.glob(os.path.join(output_path, "*.*"))
+            downloaded_files = [f for f in downloaded_files if not f.endswith('.part')]
         
-        else:
-            # Get the first file (should only be one)
-            downloaded_file = downloaded_files[0]
-            filename = os.path.basename(downloaded_file)
-            
-            print(f"✅ Found downloaded file: {filename}")
+        if not downloaded_files:
+            print(f"❌ No files found in {output_path}")
+            print(f"📁 Directory contents: {os.listdir(output_path) if os.path.exists(output_path) else 'directory does not exist'}")
+            return JSONResponse({"error": "Spotify download failed: No files created"}, status_code=500)
         
-        # Use Spotify track info if available, otherwise YouTube title
+        # Move file to main directory
+        src_file = downloaded_files[0]
+        file_ext = os.path.splitext(src_file)[1]
+        filename = f"{file_id}{file_ext}"
+        dest_file = os.path.join(DOWNLOAD_DIR, filename)
+        
+        os.rename(src_file, dest_file)
+        
+        # Clean up directory
         try:
-            title = f"{artists} - {track_name}"[:100]
+            import shutil
+            shutil.rmtree(output_path)
         except:
-            title = info.get('title', 'Spotify Track')[:100] if info else 'Spotify Track'
+            pass
+        
+        # Extract title from filename
+        title = os.path.splitext(os.path.basename(src_file))[0][:100]
         
         # Add to history
         history = load_history()
@@ -398,6 +334,10 @@ async def download_spotify(url: str, format: str, session: str):
         
         print(f"✅ Spotify download complete: {title}")
         return JSONResponse({"file": f"/api/file/{filename}", "id": file_id})
+        
+    except ImportError:
+        print(f"❌ Potty not installed")
+        return JSONResponse({"error": "Spotify downloads not available - Potty library not installed"}, status_code=500)
     except Exception as e:
         print(f"❌ Spotify download error: {e}")
         import traceback
