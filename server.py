@@ -317,19 +317,26 @@ async def download_spotify(url: str, format: str, session: str):
         
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(search_query, download=True)
-            ext = info.get("ext", output_format)
         
-        filename = f"{file_id}.{ext}"
+        # Find the actual downloaded file (post-processing changes extension)
+        downloaded_files = glob.glob(os.path.join(DOWNLOAD_DIR, f"{file_id}.*"))
         
-        if not os.path.exists(os.path.join(DOWNLOAD_DIR, filename)):
-            print(f"❌ File not found after download")
+        if not downloaded_files:
+            print(f"❌ No files found for {file_id}")
+            print(f"📁 Directory contents: {os.listdir(DOWNLOAD_DIR)}")
             return JSONResponse({"error": "Spotify download failed: File not created"}, status_code=500)
+        
+        # Get the first file (should only be one)
+        downloaded_file = downloaded_files[0]
+        filename = os.path.basename(downloaded_file)
+        
+        print(f"✅ Found downloaded file: {filename}")
         
         # Use Spotify track info if available, otherwise YouTube title
         try:
             title = f"{artists} - {track_name}"[:100]
         except:
-            title = info.get('title', 'Spotify Track')[:100]
+            title = info.get('title', 'Spotify Track')[:100] if info else 'Spotify Track'
         
         # Add to history
         history = load_history()
