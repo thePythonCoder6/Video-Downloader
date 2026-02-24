@@ -254,17 +254,45 @@ def check_auth(session: str = Cookie(None)):
 
 
 async def download_spotify(url: str, format: str, session: str):
-    """Download Spotify tracks using yt-dlp via YouTube search"""
+    """Download Spotify tracks by extracting metadata and searching YouTube"""
     file_id = str(uuid.uuid4())
     
     try:
-        print(f"🎵 Downloading from Spotify via YouTube: {url}")
+        print(f"🎵 Processing Spotify URL: {url}")
+        
+        # Extract track ID from Spotify URL
+        track_id_match = re.search(r'track/([a-zA-Z0-9]+)', url)
+        if not track_id_match:
+            return JSONResponse({"error": "Invalid Spotify track URL"}, status_code=400)
+        
+        track_id = track_id_match.group(1)
+        
+        # Use Spotify Web API (no auth needed for track metadata)
+        try:
+            import spotipy
+            from spotipy.oauth2 import SpotifyClientCredentials
+            
+            # Try without credentials first (public API)
+            sp = spotipy.Spotify()
+            track = sp.track(track_id)
+            
+            # Extract metadata
+            track_name = track['name']
+            artists = ', '.join([artist['name'] for artist in track['artists']])
+            search_query = f"{artists} - {track_name} official audio"
+            
+            print(f"🔍 Searching YouTube for: {search_query}")
+            
+        except Exception as spotify_error:
+            print(f"⚠️ Spotify API failed, using URL as search: {spotify_error}")
+            # Fallback: just use the URL as search term
+            search_query = f"ytsearch:{url}"
         
         # Determine output format
         audio_formats = ['mp3', 'm4a', 'wav', 'flac', 'aac', 'opus', 'vorbis']
         output_format = format if format in audio_formats else 'mp3'
         
-        # Use yt-dlp with Spotify URL (it searches YouTube automatically)
+        # Download from YouTube
         template = os.path.join(DOWNLOAD_DIR, f"{file_id}.%(ext)s")
         quality = "0" if output_format in ['wav', 'flac'] else "320"
         
@@ -288,7 +316,7 @@ async def download_spotify(url: str, format: str, session: str):
         }
         
         with yt_dlp.YoutubeDL(opts) as ydl:
-            info = ydl.extract_info(url, download=True)
+            info = ydl.extract_info(search_query, download=True)
             ext = info.get("ext", output_format)
         
         filename = f"{file_id}.{ext}"
@@ -297,8 +325,11 @@ async def download_spotify(url: str, format: str, session: str):
             print(f"❌ File not found after download")
             return JSONResponse({"error": "Spotify download failed: File not created"}, status_code=500)
         
-        # Extract title from info
-        title = info.get('title', 'Spotify Track')[:100]
+        # Use Spotify track info if available, otherwise YouTube title
+        try:
+            title = f"{artists} - {track_name}"[:100]
+        except:
+            title = info.get('title', 'Spotify Track')[:100]
         
         # Add to history
         history = load_history()
