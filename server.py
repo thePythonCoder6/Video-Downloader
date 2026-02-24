@@ -307,7 +307,7 @@ async def download_spotify(url: str, format: str, session: str):
                 "preferredcodec": output_format if output_format != 'vorbis' else 'vorbis',
                 "preferredquality": quality,
             }],
-            "default_search": "ytsearch1",  # Get first result only
+            # Removed default_search - using explicit search in URL
             "extractor_args": {
                 "youtube": {
                     "player_client": ["android_creator", "mediaconnect", "tv_embedded"],
@@ -315,15 +315,40 @@ async def download_spotify(url: str, format: str, session: str):
             },
         }
         
+        # Instead of using default_search, construct a direct YouTube search URL
+        yt_search_url = f"ytsearch1:{search_query}"
+        
+        print(f"🔍 Using search URL: {yt_search_url}")
+        print(f"🔍 Output template: {template}")
+        print(f"🔍 Options: {opts}")
+        
         with yt_dlp.YoutubeDL(opts) as ydl:
-            print(f"🔍 Extracting info for: {search_query}")
-            info = ydl.extract_info(search_query, download=True)
-            print(f"✅ Download completed. Info keys: {info.keys() if info else 'None'}")
+            print(f"🔍 Calling extract_info...")
+            info = ydl.extract_info(yt_search_url, download=True)
+            print(f"✅ extract_info returned")
+            
+            if info:
+                print(f"✅ Info type: {type(info)}")
+                print(f"✅ Info keys: {info.keys() if isinstance(info, dict) else 'not a dict'}")
+                if 'entries' in info:
+                    print(f"✅ Has entries: {len(info['entries'])}")
+                    if info['entries']:
+                        actual_info = info['entries'][0]
+                        print(f"✅ First entry keys: {actual_info.keys()}")
+                        print(f"✅ Video ID: {actual_info.get('id')}")
+                        print(f"✅ Title: {actual_info.get('title')}")
+            else:
+                print(f"❌ Info is None!")
+        
+        # Give FFmpeg a moment to finish post-processing
+        import time
+        time.sleep(2)
         
         # Find the actual downloaded file (post-processing changes extension)
         print(f"🔍 Looking for files matching: {file_id}.*")
         all_files = os.listdir(DOWNLOAD_DIR)
-        print(f"📁 All files in directory: {all_files}")
+        print(f"📁 All files in directory ({len(all_files)} total): {all_files}")
+        print(f"📁 Non-hidden files: {[f for f in all_files if not f.startswith('.')]}")
         
         downloaded_files = glob.glob(os.path.join(DOWNLOAD_DIR, f"{file_id}.*"))
         print(f"📁 Matched files: {downloaded_files}")
