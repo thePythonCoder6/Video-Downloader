@@ -316,21 +316,37 @@ async def download_spotify(url: str, format: str, session: str):
         }
         
         with yt_dlp.YoutubeDL(opts) as ydl:
+            print(f"🔍 Extracting info for: {search_query}")
             info = ydl.extract_info(search_query, download=True)
+            print(f"✅ Download completed. Info keys: {info.keys() if info else 'None'}")
         
         # Find the actual downloaded file (post-processing changes extension)
+        print(f"🔍 Looking for files matching: {file_id}.*")
+        all_files = os.listdir(DOWNLOAD_DIR)
+        print(f"📁 All files in directory: {all_files}")
+        
         downloaded_files = glob.glob(os.path.join(DOWNLOAD_DIR, f"{file_id}.*"))
+        print(f"📁 Matched files: {downloaded_files}")
         
         if not downloaded_files:
             print(f"❌ No files found for {file_id}")
-            print(f"📁 Directory contents: {os.listdir(DOWNLOAD_DIR)}")
-            return JSONResponse({"error": "Spotify download failed: File not created"}, status_code=500)
+            # Try alternative pattern - maybe the file has a different naming
+            alternative_files = [f for f in all_files if file_id in f and not f.endswith('.part')]
+            print(f"🔍 Alternative matches: {alternative_files}")
+            
+            if alternative_files:
+                downloaded_file = os.path.join(DOWNLOAD_DIR, alternative_files[0])
+                filename = alternative_files[0]
+                print(f"✅ Found via alternative search: {filename}")
+            else:
+                return JSONResponse({"error": f"Spotify download failed: File not created. Searched for {file_id}.* in {len(all_files)} files"}, status_code=500)
         
-        # Get the first file (should only be one)
-        downloaded_file = downloaded_files[0]
-        filename = os.path.basename(downloaded_file)
-        
-        print(f"✅ Found downloaded file: {filename}")
+        else:
+            # Get the first file (should only be one)
+            downloaded_file = downloaded_files[0]
+            filename = os.path.basename(downloaded_file)
+            
+            print(f"✅ Found downloaded file: {filename}")
         
         # Use Spotify track info if available, otherwise YouTube title
         try:
