@@ -300,14 +300,14 @@ async def download_spotify(url: str, format: str, session: str):
             "outtmpl": template,
             "format": "bestaudio/best",
             "noplaylist": True,
-            "quiet": True,
-            "no_warnings": True,
+            "quiet": False,  # Show output for debugging
+            "no_warnings": False,
             "postprocessors": [{
                 "key": "FFmpegExtractAudio",
                 "preferredcodec": output_format if output_format != 'vorbis' else 'vorbis',
                 "preferredquality": quality,
             }],
-            "default_search": "ytsearch",
+            "default_search": "ytsearch1",  # Get first result only
             "extractor_args": {
                 "youtube": {
                     "player_client": ["android_creator", "mediaconnect", "tv_embedded"],
