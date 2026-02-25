@@ -355,9 +355,14 @@ async def download_video(url: str = Form(...), cookies: str = Form(""), format: 
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=True)
-            ext = info.get("ext", "mp4")
-
-        filename = f"{file_id}.{ext}"
+        
+        # Find the actual downloaded file (post-processing may change extension)
+        downloaded_files = glob.glob(os.path.join(DOWNLOAD_DIR, f"{file_id}.*"))
+        
+        if not downloaded_files:
+            return JSONResponse({"error": "Download failed: File not created"}, status_code=500)
+        
+        filename = os.path.basename(downloaded_files[0])
         
         # Add to history
         history = load_history()
