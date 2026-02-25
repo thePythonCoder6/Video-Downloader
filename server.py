@@ -253,96 +253,7 @@ def check_auth(session: str = Cookie(None)):
     return session and session in active_sessions
 
 
-async def download_spotify(url: str, format: str, session: str):
-    """Download Spotify tracks using Potty (HARMONI)"""
-    file_id = str(uuid.uuid4())
-    
-    try:
-        print(f"🎵 Processing Spotify URL with Potty: {url}")
-        
-        # Determine output format
-        audio_formats = ['mp3', 'm4a', 'wav', 'flac', 'aac', 'opus', 'vorbis']
-        output_format = format if format in audio_formats else 'mp3'
-        
-        # Use Potty to download from Spotify
-        from potty import Downloader
-        
-        downloader = Downloader()
-        
-        # Set output directory
-        output_path = os.path.join(DOWNLOAD_DIR, file_id)
-        os.makedirs(output_path, exist_ok=True)
-        
-        print(f"🔍 Downloading with Potty to: {output_path}")
-        
-        # Download the track
-        result = downloader.download(
-            url,
-            output=output_path,
-            format=output_format
-        )
-        
-        print(f"✅ Potty download complete: {result}")
-        
-        # Find downloaded files
-        downloaded_files = glob.glob(os.path.join(output_path, f"*.{output_format}"))
-        
-        if not downloaded_files:
-            # Try any audio file
-            downloaded_files = glob.glob(os.path.join(output_path, "*.*"))
-            downloaded_files = [f for f in downloaded_files if not f.endswith('.part')]
-        
-        if not downloaded_files:
-            print(f"❌ No files found in {output_path}")
-            print(f"📁 Directory contents: {os.listdir(output_path) if os.path.exists(output_path) else 'directory does not exist'}")
-            return JSONResponse({"error": "Spotify download failed: No files created"}, status_code=500)
-        
-        # Move file to main directory
-        src_file = downloaded_files[0]
-        file_ext = os.path.splitext(src_file)[1]
-        filename = f"{file_id}{file_ext}"
-        dest_file = os.path.join(DOWNLOAD_DIR, filename)
-        
-        os.rename(src_file, dest_file)
-        
-        # Clean up directory
-        try:
-            import shutil
-            shutil.rmtree(output_path)
-        except:
-            pass
-        
-        # Extract title from filename
-        title = os.path.splitext(os.path.basename(src_file))[0][:100]
-        
-        # Add to history
-        history = load_history()
-        history_item = {
-            "id": file_id,
-            "url": url,
-            "file": f"/api/file/{filename}",
-            "filename": filename,
-            "timestamp": datetime.now().isoformat(),
-            "title": f"🎵 {title}"
-        }
-        history.insert(0, history_item)
-        
-        if len(history) > 50:
-            history = history[:50]
-        
-        save_history_data(history)
-        
-        print(f"✅ Spotify download complete: {title}")
-        return JSONResponse({"file": f"/api/file/{filename}", "id": file_id})
-        
-    except ImportError:
-        print(f"❌ Potty not installed")
-        return JSONResponse({"error": "Spotify downloads not available - Potty library not installed"}, status_code=500)
-    except Exception as e:
-        print(f"❌ Spotify download error: {e}")
-        import traceback
-        traceback.print_exc()
-        return JSONResponse({"error": f"Spotify download failed: {str(e)}"}, status_code=500)
+
 
 
 @app.post("/api/download")
@@ -350,9 +261,9 @@ async def download_video(url: str = Form(...), cookies: str = Form(""), format: 
     if not check_auth(session):
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
     
-    # Detect Spotify URLs and use spotdl
+    # Spotify not supported - suggest manual workaround
     if "spotify.com" in url:
-        return await download_spotify(url, format, session)
+        return JSONResponse({"error": "Spotify downloads not supported. Workaround: Copy the song name, search it on YouTube, then download the YouTube video."}, status_code=400)
     
     file_id = str(uuid.uuid4())
     template = os.path.join(DOWNLOAD_DIR, f"{file_id}.%(ext)s")
