@@ -281,6 +281,7 @@ async def download_video(url: str = Form(...), cookies: str = Form(""), format: 
     
     if format in audio_formats:
         # Audio extraction
+        print(f"🎵 Audio format detected: {format}")
         quality = "0" if format in ['wav', 'flac'] else "192"
         opts = {
             "outtmpl": template,
@@ -353,16 +354,34 @@ async def download_video(url: str = Form(...), cookies: str = Form(""), format: 
 
     # Try direct YouTube download first
     try:
+        print(f"🎬 Starting download with format: {format}")
+        print(f"🎬 yt-dlp options: {opts}")
+        
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=True)
         
+        print(f"✅ Download completed, info extracted")
+        print(f"📋 Info keys: {list(info.keys()) if info else 'None'}")
+        print(f"📋 Requested format: {info.get('requested_formats')} if info else 'None'")
+        
         # Find the actual downloaded file (post-processing may change extension)
+        print(f"🔍 Looking for files matching: {file_id}.*")
         downloaded_files = glob.glob(os.path.join(DOWNLOAD_DIR, f"{file_id}.*"))
+        print(f"📁 Found {len(downloaded_files)} files: {downloaded_files}")
         
         if not downloaded_files:
+            all_files = os.listdir(DOWNLOAD_DIR)
+            matching = [f for f in all_files if file_id in f]
+            print(f"📁 All files in directory: {len(all_files)} total")
+            print(f"📁 Files containing file_id: {matching}")
             return JSONResponse({"error": "Download failed: File not created"}, status_code=500)
         
+        # Use the first file found (should be only one after postprocessing)
         filename = os.path.basename(downloaded_files[0])
+        file_ext = os.path.splitext(filename)[1].lower()
+        print(f"✅ Using filename: {filename}")
+        print(f"✅ File extension: {file_ext}")
+        print(f"✅ Expected format: {format}")
         
         # Add to history
         history = load_history()
