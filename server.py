@@ -576,3 +576,9 @@ async def clear_history(session: str = Cookie(None)):
 @app.get("/api/check-auth")
 async def check_auth_endpoint(session: str = Cookie(None)):
     return JSONResponse({"authenticated": check_auth(session)})
+
+
+@app.get("/ping")
+async def ping():
+    """Health check endpoint to keep Render instance awake"""
+    return {"status": "awake"}
