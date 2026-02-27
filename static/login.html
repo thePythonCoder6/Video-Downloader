@@ -2,78 +2,156 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Login - Video Downloader</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login - Video Downloader Pro</title>
 
 <style>
+:root {
+    --primary: #6366f1;
+    --primary-hover: #4f46e5;
+    --secondary: #8b5cf6;
+    --success: #10b981;
+    --danger: #ef4444;
+    --card-bg: #1e293b;
+    --input-bg: #0f172a;
+    --border: #334155;
+    --text-muted: #94a3b8;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
 body {
-    margin:0;
-    font-family: Arial, sans-serif;
-    background:#121212;
-    color:white;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    height:100vh;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 20px;
 }
 
 .container {
-    background:#1e1e1e;
-    padding:40px;
-    border-radius:12px;
-    box-shadow:0 0 20px rgba(0,0,0,0.4);
-    text-align:center;
-    min-width:320px;
+    background: var(--card-bg);
+    padding: 50px 40px;
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    text-align: center;
+    min-width: 400px;
+    max-width: 450px;
+    border: 1px solid var(--border);
+    animation: fadeInUp 0.6s ease;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.input-group {
+    margin: 20px 0;
+    text-align: left;
+}
+
+.input-group label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 0.9rem;
 }
 
 input {
-    width:100%;
-    padding:12px;
-    margin:10px 0;
-    background:#2a2a2a;
-    border:1px solid #444;
-    border-radius:6px;
-    color:white;
-    font-size:14px;
-    box-sizing:border-box;
+    width: 100%;
+    padding: 14px 18px;
+    margin: 0;
+    background: var(--input-bg);
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    color: white;
+    font-size: 15px;
+    box-sizing: border-box;
+    transition: all 0.3s ease;
+    font-family: inherit;
 }
 
 input:focus {
-    outline:none;
-    border-color:#4ea3ff;
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
 }
 
 button {
-    width:100%;
-    padding:12px;
-    margin:15px 0 5px 0;
-    background:#4ea3ff;
-    border:none;
-    border-radius:6px;
-    color:white;
-    font-size:15px;
-    font-weight:bold;
-    cursor:pointer;
-    transition:background 0.3s;
+    width: 100%;
+    padding: 14px;
+    margin: 25px 0 10px 0;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    border: none;
+    border-radius: 12px;
+    color: white;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
 }
 
-button:hover {
-    background:#3d8dd9;
+button:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px rgba(99, 102, 241, 0.4);
 }
 
 button:disabled {
-    background:#555;
-    cursor:not-allowed;
+    background: #475569;
+    cursor: not-allowed;
+    transform: none;
 }
 
 .error {
-    color:#ff5555;
-    margin-top:10px;
-    font-size:13px;
+    color: var(--danger);
+    margin-top: 15px;
+    font-size: 14px;
+    background: rgba(239, 68, 68, 0.1);
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid var(--danger);
 }
 
 h2 {
-    margin-top:0;
-    color:#4ea3ff;
+    font-size: 2rem;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 10px;
+    font-weight: 800;
+}
+
+.subtitle {
+    color: var(--text-muted);
+    margin-bottom: 30px;
+    font-size: 1rem;
+}
+
+@media (max-width: 480px) {
+    .container {
+        min-width: unset;
+        width: 100%;
+        padding: 30px 25px;
+    }
+    
+    h2 {
+        font-size: 1.5rem;
+    }
 }
 </style>
 </head>
@@ -81,26 +159,35 @@ h2 {
 <body>
 
 <div class="container">
-    <h2>🎮 Imposter Who Game Login</h2>
+    <h2>🎬 Video Downloader Pro</h2>
+    <p class="subtitle">Please sign in to continue</p>
     
     <form onsubmit="handleLogin(event)">
-        <input 
-            type="text" 
-            id="username" 
-            placeholder="Username" 
-            autocomplete="off"
-        >
-        <input 
-            type="password" 
-            id="password" 
-            placeholder="Password" 
-            required
-            autocomplete="current-password"
-        >
-        <button type="submit" id="loginBtn">Login</button>
+        <div class="input-group">
+            <label for="username">👤 Username</label>
+            <input 
+                type="text" 
+                id="username" 
+                placeholder="Enter your username" 
+                autocomplete="username"
+            >
+        </div>
+        
+        <div class="input-group">
+            <label for="password">🔒 Password</label>
+            <input 
+                type="password" 
+                id="password" 
+                placeholder="Enter your password" 
+                required
+                autocomplete="current-password"
+            >
+        </div>
+        
+        <button type="submit" id="loginBtn">🚀 Sign In</button>
     </form>
     
-    <p id="error" class="error"></p>
+    <p id="error" class="error" style="display: none;"></p>
 </div>
 
 <script>
@@ -113,6 +200,7 @@ async function handleLogin(event) {
     const errorEl = document.getElementById("error");
     const loginBtn = document.getElementById("loginBtn");
     
+    errorEl.style.display = "none";
     errorEl.textContent = "";
     
     // If password is 4 digits and username is empty, it's a PIN login
@@ -120,12 +208,13 @@ async function handleLogin(event) {
     
     // Validate: if not PIN login, username is required
     if (!isPinLogin && !username.trim()) {
-        errorEl.textContent = "Please enter username or use 4-digit PIN";
+        errorEl.textContent = "⚠️ Please enter username or use 4-digit PIN";
+        errorEl.style.display = "block";
         return;
     }
     
     loginBtn.disabled = true;
-    loginBtn.textContent = "Logging in...";
+    loginBtn.textContent = "🔄 Signing in...";
     
     const form = new FormData();
     if (isPinLogin) {
@@ -144,16 +233,21 @@ async function handleLogin(event) {
         const data = await res.json();
         
         if (data.success) {
-            window.location.href = "/";
+            loginBtn.textContent = "✅ Success! Redirecting...";
+            setTimeout(() => {
+                window.location.href = "/";
+            }, 500);
         } else {
-            errorEl.textContent = "Invalid credentials";
+            errorEl.textContent = "❌ Invalid credentials. Please try again.";
+            errorEl.style.display = "block";
             loginBtn.disabled = false;
-            loginBtn.textContent = "Login";
+            loginBtn.textContent = "🚀 Sign In";
         }
     } catch (err) {
-        errorEl.textContent = "Login failed. Please try again.";
+        errorEl.textContent = "❌ Login failed. Please check your connection and try again.";
+        errorEl.style.display = "block";
         loginBtn.disabled = false;
-        loginBtn.textContent = "Login";
+        loginBtn.textContent = "🚀 Sign In";
     }
 }
 </script>
