@@ -573,6 +573,77 @@ async def check_auth_endpoint(session: str = Cookie(None)):
     return JSONResponse({"authenticated": check_auth(session)})
 
 
+@app.post("/api/convert")
+async def convert_file(filename: str = Form(...), target_format: str = Form(...), session: str = Cookie(None)):
+    if not check_auth(session):
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    
+    source_path = os.path.join(DOWNLOAD_DIR, filename)
+    
+    if not os.path.exists(source_path):
+        return JSONResponse({"error": "Source file not found"}, status_code=404)
+    
+    # Generate new file ID for converted file
+    file_id = str(uuid.uuid4())
+    output_template = os.path.join(DOWNLOAD_DIR, f"{file_id}.%(ext)s")
+    
+    audio_formats = ['mp3', 'm4a', 'wav', 'flac', 'aac', 'opus', 'vorbis']
+    video_formats = ['mp4', 'webm', 'mkv', 'avi', 'mov', 'flv']
+    
+    try:
+        if target_format in audio_formats:
+            # Convert to audio
+            quality = "0" if target_format in ['wav', 'flac'] else "192"
+            opts = {
+                "outtmpl": output_template,
+                "format": "bestaudio/best",
+                "postprocessors": [{
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": target_format if target_format != 'vorbis' else 'vorbis',
+                    "preferredquality": quality,
+                }],
+            }
+            
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                # Use the local file as input
+                ydl.extract_info(source_path, download=False)
+                # Process the file
+                subprocess.run([
+                    'ffmpeg', '-i', source_path,
+                    '-vn',  # No video
+                    '-acodec', target_format if target_format != 'vorbis' else 'libvorbis',
+                    '-b:a', f'{quality}k' if quality != "0" else '0',
+                    os.path.join(DOWNLOAD_DIR, f"{file_id}.{target_format}")
+                ], check=True, capture_output=True)
+            
+            output_filename = f"{file_id}.{target_format}"
+            
+        elif target_format in video_formats:
+            # Convert video format
+            output_filename = f"{file_id}.{target_format}"
+            output_path = os.path.join(DOWNLOAD_DIR, output_filename)
+            
+            subprocess.run([
+                'ffmpeg', '-i', source_path,
+                '-c:v', 'copy' if target_format == 'mp4' else 'libx264',
+                '-c:a', 'copy' if target_format == 'mp4' else 'aac',
+                output_path
+            ], check=True, capture_output=True)
+        else:
+            return JSONResponse({"error": "Invalid format"}, status_code=400)
+        
+        return JSONResponse({
+            "file": f"/api/file/{output_filename}",
+            "filename": output_filename
+        })
+    
+    except subprocess.CalledProcessError as e:
+        error_output = e.stderr.decode() if e.stderr else str(e)
+        return JSONResponse({"error": f"Conversion failed: {error_output}"}, status_code=500)
+    except Exception as e:
+        return JSONResponse({"error": f"Conversion failed: {str(e)}"}, status_code=500)
+
+
 @app.get("/ping")
 async def ping():
     """Health check endpoint to keep Render instance awake"""

@@ -146,6 +146,54 @@ button {
     cursor:pointer;
 }
 
+.format-dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.format-menu {
+    display: none;
+    position: absolute;
+    bottom: 100%;
+    right: 0;
+    background: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 6px;
+    padding: 8px 0;
+    margin-bottom: 5px;
+    min-width: 160px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    z-index: 1000;
+}
+
+.format-menu.show {
+    display: block;
+}
+
+.format-menu-section {
+    padding: 4px 12px;
+    font-size: 11px;
+    color: #888;
+    font-weight: bold;
+    border-bottom: 1px solid #333;
+}
+
+.format-menu button {
+    display: block;
+    width: 100%;
+    padding: 8px 12px;
+    font-size: 12px;
+    background: transparent;
+    border: none;
+    color: white;
+    text-align: left;
+    cursor: pointer;
+}
+
+.format-menu button:hover {
+    background: #3a3a3a;
+}
+
 .empty-history {
     color:#888;
     font-style:italic;
@@ -266,7 +314,21 @@ function renderHistory() {
             </div>
             <div class="history-buttons">
                 <button onclick="playHistoryVideo('${item.file}')" style="background:#4ea3ff;color:white;">▶️ Watch</button>
-                <button onclick="downloadHistoryVideo('${item.file}')" style="background:#2ecc71;color:white;">⬇️</button>
+                <div class="format-dropdown">
+                    <button onclick="toggleFormatMenu('${item.id}')" style="background:#2ecc71;color:white;">⬇️ Download ▾</button>
+                    <div id="format-menu-${item.id}" class="format-menu">
+                        <div class="format-menu-section">VIDEO FORMATS</div>
+                        <button onclick="convertAndDownload('${item.filename}', 'mp4', '${item.id}')">MP4</button>
+                        <button onclick="convertAndDownload('${item.filename}', 'webm', '${item.id}')">WebM</button>
+                        <button onclick="convertAndDownload('${item.filename}', 'mkv', '${item.id}')">MKV</button>
+                        <button onclick="convertAndDownload('${item.filename}', 'avi', '${item.id}')">AVI</button>
+                        <div class="format-menu-section">AUDIO FORMATS</div>
+                        <button onclick="convertAndDownload('${item.filename}', 'mp3', '${item.id}')">MP3</button>
+                        <button onclick="convertAndDownload('${item.filename}', 'm4a', '${item.id}')">M4A</button>
+                        <button onclick="convertAndDownload('${item.filename}', 'wav', '${item.id}')">WAV</button>
+                        <button onclick="convertAndDownload('${item.filename}', 'flac', '${item.id}')">FLAC</button>
+                    </div>
+                </div>
                 <button onclick="deleteHistoryItem('${item.id}')" style="background:#ff5555;color:white;">🗑️</button>
             </div>
         </div>
@@ -333,6 +395,69 @@ function playHistoryVideo(file) {
 // Download video from history
 function downloadHistoryVideo(file) {
     window.location.href = file;
+}
+
+// Toggle format menu
+function toggleFormatMenu(videoId) {
+    const menu = document.getElementById(`format-menu-${videoId}`);
+    
+    // Close all other menus
+    document.querySelectorAll('.format-menu').forEach(m => {
+        if (m !== menu) m.classList.remove('show');
+    });
+    
+    menu.classList.toggle('show');
+}
+
+// Close format menus when clicking outside
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.format-dropdown')) {
+        document.querySelectorAll('.format-menu').forEach(m => {
+            m.classList.remove('show');
+        });
+    }
+});
+
+// Convert and download video
+async function convertAndDownload(filename, format, videoId) {
+    const menu = document.getElementById(`format-menu-${videoId}`);
+    menu.classList.remove('show');
+    
+    // Show loading indicator
+    const historyItem = menu.closest('.history-item');
+    const originalHTML = historyItem.innerHTML;
+    historyItem.innerHTML = '<div style="text-align:center;padding:20px;">🔄 Converting to ' + format.toUpperCase() + '...</div>';
+    
+    try {
+        const formData = new FormData();
+        formData.append('filename', filename);
+        formData.append('target_format', format);
+        
+        const res = await fetch('/api/convert', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await res.json();
+        
+        if (data.error) {
+            alert('Conversion failed: ' + data.error);
+            historyItem.innerHTML = originalHTML;
+            return;
+        }
+        
+        // Download the converted file
+        window.location.href = data.file;
+        
+        // Restore UI after a moment
+        setTimeout(() => {
+            historyItem.innerHTML = originalHTML;
+        }, 1000);
+        
+    } catch (err) {
+        alert('Conversion failed: ' + err.message);
+        historyItem.innerHTML = originalHTML;
+    }
 }
 
 // Delete history item
