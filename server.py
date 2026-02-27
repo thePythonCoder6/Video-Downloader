@@ -423,25 +423,20 @@ async def download_video(url: str = Form(...), cookies: str = Form(""), format: 
                         try:
                             print(f"🔄 Trying Webshare proxy: {proxy.split('@')[1] if '@' in proxy else proxy}")
                             
-                            opts_proxy = {
-                                "outtmpl": template,
-                                "format": "best",
-                                "noplaylist": True,
-                                "quiet": True,
-                                "socket_timeout": 20,
-                                "proxy": proxy,
-                                "extractor_args": {
-                                    "youtube": {
-                                        "player_client": ["android_creator", "mediaconnect"],
-                                    }
-                                },
-                            }
+                            # Copy original opts and add proxy
+                            opts_proxy = opts.copy()
+                            opts_proxy["proxy"] = proxy
+                            opts_proxy["socket_timeout"] = 20
                             
                             with yt_dlp.YoutubeDL(opts_proxy) as ydl:
                                 info = ydl.extract_info(url, download=True)
-                                ext = info.get("ext", "mp4")
-
-                            filename = f"{file_id}.{ext}"
+                            
+                            # Find downloaded file
+                            downloaded_files = glob.glob(os.path.join(DOWNLOAD_DIR, f"{file_id}.*"))
+                            if not downloaded_files:
+                                raise Exception("File not created after proxy download")
+                            
+                            filename = os.path.basename(downloaded_files[0])
                             
                             # Add to history
                             history = load_history()
